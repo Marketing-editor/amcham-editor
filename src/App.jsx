@@ -1614,35 +1614,6 @@ export default function App() {
 
         <div style={styles.layout}>
           <div>
-            <Card title="Import / Export">
-              <Field label="Paste modified HTML" hint="Bring an externally edited HTML back into the editor">
-                <TextArea
-                  rows={12}
-                  value={importHtmlText}
-                  onChange={(e) => setImportHtmlText(e.target.value)}
-                />
-              </Field>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-                <Button onClick={importHtml}>Import HTML</Button>
-                <GhostButton onClick={() => setImportHtmlText("")}>Clear</GhostButton>
-              </div>
-              <div style={{ ...styles.smallText, marginBottom: 16 }}>
-                Best results come from HTML that follows this editor’s table structure. If the structure changed a lot, some parts may stay on the current template.
-              </div>
-
-              <Field label="JSON backup" hint="Most reliable save/restore format">
-                <TextArea
-                  rows={10}
-                  value={jsonText}
-                  onChange={(e) => setJsonText(e.target.value)}
-                />
-              </Field>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <Button onClick={exportJson}>Export JSON</Button>
-                <GhostButton onClick={importJson}>Import JSON</GhostButton>
-                <GhostButton onClick={() => setJsonText("")}>Clear</GhostButton>
-              </div>
-            </Card>
 
             <Card title="Event Info">
               <Field label="Banner image URL">
@@ -1949,7 +1920,35 @@ export default function App() {
                 </div>
               )}
             </Card>
+            <Card title="Import / Export">
+              <Field label="Paste modified HTML" hint="Bring an externally edited HTML back into the editor">
+                <TextArea
+                  rows={12}
+                  value={importHtmlText}
+                  onChange={(e) => setImportHtmlText(e.target.value)}
+                />
+              </Field>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                <Button onClick={importHtml}>Import HTML</Button>
+                <GhostButton onClick={() => setImportHtmlText("")}>Clear</GhostButton>
+              </div>
+              <div style={{ ...styles.smallText, marginBottom: 16 }}>
+                Best results come from HTML that follows this editor’s table structure. If the structure changed a lot, some parts may stay on the current template.
+              </div>
 
+              <Field label="JSON backup" hint="Most reliable save/restore format">
+                <TextArea
+                  rows={10}
+                  value={jsonText}
+                  onChange={(e) => setJsonText(e.target.value)}
+                />
+              </Field>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <Button onClick={exportJson}>Export JSON</Button>
+                <GhostButton onClick={importJson}>Import JSON</GhostButton>
+                <GhostButton onClick={() => setJsonText("")}>Clear</GhostButton>
+              </div>
+            </Card>
             <Card title="Exported HTML">
               <Field label="Timetable only">
                 <TextArea value={timetableHtml} readOnly rows={10} />
