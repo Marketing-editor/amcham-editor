@@ -8,10 +8,11 @@ import React, { useEffect, useMemo, useState } from "react";
  * - Import modified HTML back into editor
  * - Reset to provided baseline template
  * - Optional REGISTER button between Cost and Event Timetable
+ * - Outlook-friendly timetable/register rendering
  */
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const STORAGE_KEY = "amcham_full_email_editor_pretty_v3";
+const STORAGE_KEY = "amcham_full_email_editor_pretty_v4";
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -214,6 +215,8 @@ function cloneDefault() {
   };
 }
 
+/* -------------------- Email HTML builders -------------------- */
+
 function buildRegisterButtonHtml(state) {
   if (!state.showRegisterButton || !state.registerUrl.trim()) return "";
 
@@ -224,21 +227,18 @@ function buildRegisterButtonHtml(state) {
        style="border-collapse:collapse; margin-top:25px; margin-bottom:5px; font-family: Arial;">
   <tr>
     <td align="center">
-      <a href="${escapeHtml(state.registerUrl)}"
-         target="_blank"
-         style="
-           display:inline-block;
-           background:#b90010;
-           color:#ffffff;
-           text-decoration:none;
-           font-weight:bold;
-           font-size:13pt;
-           padding:12px 28px;
-           border-radius:999px;
-           letter-spacing:0.2px;
-         ">
-        ${escapeHtml(state.registerLabel || "REGISTER")}
-      </a>
+      <table border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+        <tr>
+          <td align="center" bgcolor="#b90010"
+              style="background:#b90010; padding:12px 28px;">
+            <a href="${escapeHtml(state.registerUrl)}"
+               target="_blank"
+               style="font-family:Arial, sans-serif; font-size:13pt; font-weight:bold; color:#ffffff; text-decoration:none; display:inline-block;">
+              ${escapeHtml(state.registerLabel || "REGISTER")}
+            </a>
+          </td>
+        </tr>
+      </table>
     </td>
   </tr>
 </table>`;
@@ -278,15 +278,18 @@ function buildSessionBlockHtml(time, title, speakers) {
   const speakersHtml = (speakers || []).map(buildSpeakerRow).join("\n");
   return `
 <tr style="font-size:11pt;">
-  <td width="20%" align="center" style="background:#fff; border-top:1px solid #dddddd; border-right:1px solid #dddddd; padding:5px;">
+  <td width="20%" align="center" valign="middle"
+      style="background:#fff; border-top:1px solid #dddddd; border-right:1px solid #dddddd; padding:5px;">
     <strong>${escapeHtml(time || "")}</strong>
   </td>
   <td colspan="3" style="border-top:1px solid #dddddd; padding:0;">
     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; font-family: Arial;">
       <tr>
-        <th colspan="4" align="left" height="35" style="font-size:10pt; padding-left:15px;">
+        <td colspan="4" align="left" valign="middle"
+            height="35"
+            style="font-size:10pt; padding-left:15px; font-weight:bold; line-height:35px; font-family:Arial, sans-serif;">
           ${escapeHtml(title || "")}
-        </th>
+        </td>
       </tr>
       ${speakersHtml}
     </table>
@@ -297,9 +300,10 @@ function buildSessionBlockHtml(time, title, speakers) {
 function buildHeaderBlockHtml(title) {
   return `
 <tr>
-  <th colspan="4" width="100%" align="center" height="45" style="background:#FEFBE9; border-top:1px solid #dddddd; color:#b90010; font-size:13pt;">
+  <td colspan="4" width="100%" align="center" valign="middle"
+      style="background:#FEFBE9; border-top:1px solid #dddddd; color:#b90010; font-size:13pt; font-weight:bold; height:45px; line-height:45px; font-family:Arial, sans-serif;">
     ${escapeHtml(title || "")}
-  </th>
+  </td>
 </tr>`;
 }
 
@@ -323,10 +327,10 @@ function buildSimpleBlockHtml({ time, label, bold, highlight, centerLabel }) {
 
   return `
 <tr style="font-size:11pt;">
-  <td width="20%" align="center" style="${leftStyle}">
+  <td width="20%" align="center" valign="middle" style="${leftStyle}">
     <strong style="font-size:11pt;">${escapeHtml(time || "")}</strong>
   </td>
-  <td colspan="3" align="left" style="${rightStyle}">
+  <td colspan="3" align="left" valign="middle" style="${rightStyle}">
     ${labelHtml}
   </td>
 </tr>`;
@@ -350,9 +354,12 @@ function buildTimetableHtml(state) {
     state.tableFont
   )};">
   <tr>
-    <th colspan="4" width="100%" align="center" height="45" style="background:#FEFBE9; border-top:2px solid #263159; color:#b90010; font-size:13pt;">
+    <td colspan="4" width="100%" align="center" valign="middle"
+        style="background:#FEFBE9; border-top:2px solid #263159; color:#b90010; font-size:13pt; font-weight:bold; height:45px; line-height:45px; font-family:${escapeHtml(
+          state.tableFont
+        )};">
       ${escapeHtml(state.timetableTitle)}
-    </th>
+    </td>
   </tr>
   ${blocksHtml}
 </table>`;
@@ -558,6 +565,8 @@ function buildFullEmailHtml(state) {
 </html>`;
 }
 
+/* -------------------- Interactive preview builders -------------------- */
+
 function buildInteractiveSpeakerRow(blockId, sp) {
   const tagHtml = sp.tag
     ? `<strong><span style="color:red;"><i>${escapeHtml(
@@ -607,17 +616,20 @@ function buildInteractiveSessionBlockHtml(block) {
 
   return `
 <tr style="font-size:11pt;">
-  <td width="20%" align="center" style="background:#fff; border-top:1px solid #dddddd; border-right:1px solid #dddddd; padding:5px;">
+  <td width="20%" align="center" valign="middle"
+      style="background:#fff; border-top:1px solid #dddddd; border-right:1px solid #dddddd; padding:5px;">
     <strong>${escapeHtml(block.time || "")}</strong>
   </td>
   <td colspan="3" style="border-top:1px solid #dddddd; padding:0;">
     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; font-family: Arial;">
       <tr>
-        <th colspan="4" align="left" height="35" style="font-size:10pt; padding-left:15px;">
+        <td colspan="4" align="left" valign="middle"
+            height="35"
+            style="font-size:10pt; padding-left:15px; font-weight:bold; line-height:35px; font-family:Arial, sans-serif;">
           <span contenteditable="true" data-editable="true" data-kind="block" data-block-id="${escapeHtml(
             block.id
           )}" data-field="title">${escapeHtml(block.title || "")}</span>
-        </th>
+        </td>
       </tr>
       ${speakersHtml}
     </table>
@@ -628,11 +640,12 @@ function buildInteractiveSessionBlockHtml(block) {
 function buildInteractiveHeaderBlockHtml(block) {
   return `
 <tr>
-  <th colspan="4" width="100%" align="center" height="45" style="background:#FEFBE9; border-top:1px solid #dddddd; color:#b90010; font-size:13pt;">
+  <td colspan="4" width="100%" align="center" valign="middle"
+      style="background:#FEFBE9; border-top:1px solid #dddddd; color:#b90010; font-size:13pt; font-weight:bold; height:45px; line-height:45px; font-family:Arial, sans-serif;">
     <span contenteditable="true" data-editable="true" data-kind="block" data-block-id="${escapeHtml(
       block.id
     )}" data-field="title">${escapeHtml(block.title || "")}</span>
-  </th>
+  </td>
 </tr>`;
 }
 
@@ -653,13 +666,18 @@ function buildInteractiveTimetableHtml(state) {
     state.tableFont
   )};">
   <tr>
-    <th colspan="4" width="100%" align="center" height="45" style="background:#FEFBE9; border-top:2px solid #263159; color:#b90010; font-size:13pt;">
+    <td colspan="4" width="100%" align="center" valign="middle"
+        style="background:#FEFBE9; border-top:2px solid #263159; color:#b90010; font-size:13pt; font-weight:bold; height:45px; line-height:45px; font-family:${escapeHtml(
+          state.tableFont
+        )};">
       ${escapeHtml(state.timetableTitle)}
-    </th>
+    </td>
   </tr>
   ${blocksHtml}
 </table>`;
 }
+
+/* -------------------- HTML import parser -------------------- */
 
 function parseHtmlToState(html) {
   const parser = new DOMParser();
@@ -755,14 +773,14 @@ function parseHtmlToState(html) {
 
   const timetableRoot = Array.from(doc.querySelectorAll("table")).find(
     (table) => {
-      const firstTh = table.querySelector("tr > th");
-      return firstTh && (firstTh.textContent || "").trim() === "Event Timetable";
+      const firstCell = table.querySelector("tr > th, tr > td");
+      return firstCell && (firstCell.textContent || "").trim() === "Event Timetable";
     }
   );
 
   if (timetableRoot) {
-    const topTh = timetableRoot.querySelector("tr > th");
-    next.timetableTitle = (topTh?.textContent || next.timetableTitle).trim();
+    const topCell = timetableRoot.querySelector("tr > th, tr > td");
+    next.timetableTitle = (topCell?.textContent || next.timetableTitle).trim();
     const rows = Array.from(
       timetableRoot.querySelectorAll(":scope > tbody > tr, :scope > tr")
     ).slice(1);
@@ -781,13 +799,27 @@ function parseHtmlToState(html) {
         return;
       }
 
+      if (tds.length === 1 && ths.length === 0) {
+        const only = tds[0];
+        const colspan = only.getAttribute("colspan");
+        if (colspan === "4") {
+          blocks.push({
+            id: uid(),
+            type: "header",
+            title: (only.textContent || "").trim(),
+          });
+          return;
+        }
+      }
+
       if (tds.length >= 2) {
         const time = (tds[0].textContent || "").trim();
         const secondTd = tds[1];
         const nestedTable = secondTd.querySelector("table");
 
         if (nestedTable) {
-          const title = (nestedTable.querySelector("th")?.textContent || "").trim();
+          const titleCell = nestedTable.querySelector("th, td");
+          const title = (titleCell?.textContent || "").trim();
           const speakerRows = Array.from(
             nestedTable.querySelectorAll(":scope > tbody > tr, :scope > tr")
           ).slice(1);
@@ -890,6 +922,8 @@ function parseHtmlToState(html) {
 
   return { state: next, warnings };
 }
+
+/* -------------------- UI styles -------------------- */
 
 const styles = {
   page: {
@@ -1110,6 +1144,8 @@ const styles = {
   },
 };
 
+/* -------------------- UI components -------------------- */
+
 function Field({ label, children, hint }) {
   return (
     <div style={styles.field}>
@@ -1196,6 +1232,8 @@ function Segmented({ value, onChange, options }) {
     </div>
   );
 }
+
+/* -------------------- Interactive preview -------------------- */
 
 function InteractivePreview({ state, setState }) {
   const editableDoc = `<!DOCTYPE html>
@@ -1513,6 +1551,8 @@ function InteractivePreview({ state, setState }) {
     </div>
   );
 }
+
+/* -------------------- App -------------------- */
 
 export default function App() {
   const [state, setState] = useState(() => {
