@@ -8,11 +8,11 @@ import React, { useEffect, useMemo, useState } from "react";
  * - Import modified HTML back into editor
  * - Reset to provided baseline template
  * - Optional REGISTER button between Cost and Event Timetable
- * - Outlook-friendly timetable/register rendering
+ * - Improved Outlook compatibility
  */
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const STORAGE_KEY = "amcham_full_email_editor_pretty_v4";
+const STORAGE_KEY = "amcham_full_email_editor_pretty_v6";
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -31,6 +31,21 @@ function textFromHtml(html) {
   const div = document.createElement("div");
   div.innerHTML = html || "";
   return (div.textContent || "").trim();
+}
+
+function spacerTable(width, height) {
+  return `
+<table width="${escapeHtml(
+    width
+  )}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+  <tr>
+    <td height="${escapeHtml(
+      height
+    )}" style="height:${escapeHtml(height)}px; line-height:${escapeHtml(
+    height
+  )}px; font-size:0; mso-line-height-rule:exactly;">&nbsp;</td>
+  </tr>
+</table>`;
 }
 
 function cloneDefault() {
@@ -220,28 +235,40 @@ function cloneDefault() {
 function buildRegisterButtonHtml(state) {
   if (!state.showRegisterButton || !state.registerUrl.trim()) return "";
 
+  const label = escapeHtml(state.registerLabel || "REGISTER");
+  const url = escapeHtml(state.registerUrl);
+
   return `
+${spacerTable(state.width, 12)}
 <table width="${escapeHtml(
     state.width
   )}" border="0" cellspacing="0" cellpadding="0"
-       style="border-collapse:collapse; margin-top:25px; margin-bottom:5px; font-family: Arial;">
+       style="border-collapse:collapse; font-family:Arial, sans-serif;">
   <tr>
-    <td align="center">
-      <table border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
-        <tr>
-          <td align="center" bgcolor="#b90010"
-              style="background:#b90010; padding:12px 28px;">
-            <a href="${escapeHtml(state.registerUrl)}"
-               target="_blank"
-               style="font-family:Arial, sans-serif; font-size:13pt; font-weight:bold; color:#ffffff; text-decoration:none; display:inline-block;">
-              ${escapeHtml(state.registerLabel || "REGISTER")}
-            </a>
-          </td>
-        </tr>
-      </table>
+    <td align="center" valign="middle">
+      <!--[if mso]>
+      <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml"
+        href="${url}"
+        style="height:42px;v-text-anchor:middle;width:180px;"
+        arcsize="12%"
+        stroke="f"
+        fillcolor="#b90010">
+        <w:anchorlock/>
+        <center style="color:#ffffff;font-family:Arial, sans-serif;font-size:20px;font-weight:bold;">
+          ${label}
+        </center>
+      </v:roundrect>
+      <![endif]-->
+      <!--[if !mso]><!-- -->
+      <a href="${url}" target="_blank"
+         style="background:#b90010;color:#ffffff;display:inline-block;font-family:Arial, sans-serif;font-size:20px;font-weight:bold;line-height:42px;text-align:center;text-decoration:none;width:180px;-webkit-text-size-adjust:none;border-radius:6px;">
+        ${label}
+      </a>
+      <!--<![endif]-->
     </td>
   </tr>
-</table>`;
+</table>
+${spacerTable(state.width, 8)}`;
 }
 
 function buildSpeakerRow(sp) {
@@ -285,10 +312,15 @@ function buildSessionBlockHtml(time, title, speakers) {
   <td colspan="3" style="border-top:1px solid #dddddd; padding:0;">
     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; font-family: Arial;">
       <tr>
-        <td colspan="4" align="left" valign="middle"
-            height="35"
-            style="font-size:10pt; padding-left:15px; font-weight:bold; line-height:35px; font-family:Arial, sans-serif;">
-          ${escapeHtml(title || "")}
+        <td style="padding:0;">
+          <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+            <tr>
+              <td align="left" valign="middle" height="35"
+                  style="height:35px; line-height:35px; mso-line-height-rule:exactly; font-size:10pt; font-weight:bold; padding-left:15px; font-family:Arial, sans-serif;">
+                ${escapeHtml(title || "")}
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
       ${speakersHtml}
@@ -300,9 +332,15 @@ function buildSessionBlockHtml(time, title, speakers) {
 function buildHeaderBlockHtml(title) {
   return `
 <tr>
-  <td colspan="4" width="100%" align="center" valign="middle"
-      style="background:#FEFBE9; border-top:1px solid #dddddd; color:#b90010; font-size:13pt; font-weight:bold; height:45px; line-height:45px; font-family:Arial, sans-serif;">
-    ${escapeHtml(title || "")}
+  <td colspan="4" style="padding:0;">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+      <tr>
+        <td align="center" valign="middle" height="45"
+            style="background:#FEFBE9; border-top:1px solid #dddddd; color:#b90010; font-size:13pt; font-weight:bold; height:45px; line-height:45px; mso-line-height-rule:exactly; font-family:Arial, sans-serif;">
+          ${escapeHtml(title || "")}
+        </td>
+      </tr>
+    </table>
   </td>
 </tr>`;
 }
@@ -350,15 +388,21 @@ function buildTimetableHtml(state) {
   return `
 <table width="${escapeHtml(
     state.width
-  )}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-top:30px; color:#000; font-family:${escapeHtml(
+  )}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; color:#000; font-family:${escapeHtml(
     state.tableFont
   )};">
   <tr>
-    <td colspan="4" width="100%" align="center" valign="middle"
-        style="background:#FEFBE9; border-top:2px solid #263159; color:#b90010; font-size:13pt; font-weight:bold; height:45px; line-height:45px; font-family:${escapeHtml(
-          state.tableFont
-        )};">
-      ${escapeHtml(state.timetableTitle)}
+    <td colspan="4" style="padding:0;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+        <tr>
+          <td align="center" valign="middle" height="45"
+              style="background:#FEFBE9; border-top:2px solid #263159; color:#b90010; font-size:13pt; font-weight:bold; height:45px; line-height:45px; mso-line-height-rule:exactly; font-family:${escapeHtml(
+                state.tableFont
+              )};">
+            ${escapeHtml(state.timetableTitle)}
+          </td>
+        </tr>
+      </table>
     </td>
   </tr>
   ${blocksHtml}
@@ -367,6 +411,7 @@ function buildTimetableHtml(state) {
 
 function buildFullEmailHtml(state) {
   const registerButton = buildRegisterButtonHtml(state);
+  const beforeTimetableSpacer = spacerTable(state.width, 20);
   const timetable = buildTimetableHtml(state);
 
   const FOOTER_HTML = `
@@ -510,7 +555,7 @@ function buildFullEmailHtml(state) {
         </table>
 
         ${registerButton}
-
+        ${beforeTimetableSpacer}
         ${timetable}
 
         <table width="${escapeHtml(state.width)}" border="0" cellspacing="0" cellpadding="0"
@@ -623,12 +668,17 @@ function buildInteractiveSessionBlockHtml(block) {
   <td colspan="3" style="border-top:1px solid #dddddd; padding:0;">
     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; font-family: Arial;">
       <tr>
-        <td colspan="4" align="left" valign="middle"
-            height="35"
-            style="font-size:10pt; padding-left:15px; font-weight:bold; line-height:35px; font-family:Arial, sans-serif;">
-          <span contenteditable="true" data-editable="true" data-kind="block" data-block-id="${escapeHtml(
-            block.id
-          )}" data-field="title">${escapeHtml(block.title || "")}</span>
+        <td style="padding:0;">
+          <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+            <tr>
+              <td align="left" valign="middle" height="35"
+                  style="height:35px; line-height:35px; mso-line-height-rule:exactly; font-size:10pt; font-weight:bold; padding-left:15px; font-family:Arial, sans-serif;">
+                <span contenteditable="true" data-editable="true" data-kind="block" data-block-id="${escapeHtml(
+                  block.id
+                )}" data-field="title">${escapeHtml(block.title || "")}</span>
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
       ${speakersHtml}
@@ -640,11 +690,17 @@ function buildInteractiveSessionBlockHtml(block) {
 function buildInteractiveHeaderBlockHtml(block) {
   return `
 <tr>
-  <td colspan="4" width="100%" align="center" valign="middle"
-      style="background:#FEFBE9; border-top:1px solid #dddddd; color:#b90010; font-size:13pt; font-weight:bold; height:45px; line-height:45px; font-family:Arial, sans-serif;">
-    <span contenteditable="true" data-editable="true" data-kind="block" data-block-id="${escapeHtml(
-      block.id
-    )}" data-field="title">${escapeHtml(block.title || "")}</span>
+  <td colspan="4" style="padding:0;">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+      <tr>
+        <td align="center" valign="middle" height="45"
+            style="background:#FEFBE9; border-top:1px solid #dddddd; color:#b90010; font-size:13pt; font-weight:bold; height:45px; line-height:45px; mso-line-height-rule:exactly; font-family:Arial, sans-serif;">
+          <span contenteditable="true" data-editable="true" data-kind="block" data-block-id="${escapeHtml(
+            block.id
+          )}" data-field="title">${escapeHtml(block.title || "")}</span>
+        </td>
+      </tr>
+    </table>
   </td>
 </tr>`;
 }
@@ -662,15 +718,21 @@ function buildInteractiveTimetableHtml(state) {
   return `
 <table width="${escapeHtml(
     state.width
-  )}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-top:30px; color:#000; font-family:${escapeHtml(
+  )}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; color:#000; font-family:${escapeHtml(
     state.tableFont
   )};">
   <tr>
-    <td colspan="4" width="100%" align="center" valign="middle"
-        style="background:#FEFBE9; border-top:2px solid #263159; color:#b90010; font-size:13pt; font-weight:bold; height:45px; line-height:45px; font-family:${escapeHtml(
-          state.tableFont
-        )};">
-      ${escapeHtml(state.timetableTitle)}
+    <td colspan="4" style="padding:0;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+        <tr>
+          <td align="center" valign="middle" height="45"
+              style="background:#FEFBE9; border-top:2px solid #263159; color:#b90010; font-size:13pt; font-weight:bold; height:45px; line-height:45px; mso-line-height-rule:exactly; font-family:${escapeHtml(
+                state.tableFont
+              )};">
+            ${escapeHtml(state.timetableTitle)}
+          </td>
+        </tr>
+      </table>
     </td>
   </tr>
   ${blocksHtml}
@@ -1355,7 +1417,7 @@ function InteractivePreview({ state, setState }) {
           </table>
 
           ${buildRegisterButtonHtml(state)}
-
+          ${spacerTable(state.width, 20)}
           ${buildInteractiveTimetableHtml(state)}
 
           <table width="${escapeHtml(
