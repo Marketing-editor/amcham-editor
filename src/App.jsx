@@ -6,12 +6,12 @@ import React, { useEffect, useMemo, useState } from "react";
  * - Edit event info + timetable blocks
  * - Inline edit inside preview
  * - Import modified HTML back into editor
- * - Export / Import JSON backup
  * - Reset to provided baseline template
+ * - Optional REGISTER button between Cost and Event Timetable
  */
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const STORAGE_KEY = "amcham_full_email_editor_pretty_v2";
+const STORAGE_KEY = "amcham_full_email_editor_pretty_v3";
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -44,6 +44,9 @@ function cloneDefault() {
     description: "TBD",
     costHtml:
       "• Member Companies: KRW 00 per admission<br>• Non-Member Companies: KRW 00 per admission",
+    showRegisterButton: false,
+    registerLabel: "REGISTER",
+    registerUrl: "",
     rsvpBy: "TBD",
     rsvpNotesHtml:
       "* Registration must be completed in advance.<br>* Free cancelations will be accepted only until TBD (12pm noon).",
@@ -91,7 +94,8 @@ function cloneDefault() {
             name: "TBD",
             title: "",
             org: "",
-            photoUrl: "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
+            photoUrl:
+              "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
             photoW: 88,
             photoH: 110,
             tag: "",
@@ -109,7 +113,8 @@ function cloneDefault() {
             name: "TBD",
             title: "",
             org: "",
-            photoUrl: "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
+            photoUrl:
+              "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
             photoW: 88,
             photoH: 110,
             tag: "",
@@ -128,7 +133,8 @@ function cloneDefault() {
             name: "TBD",
             title: "",
             org: "",
-            photoUrl: "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
+            photoUrl:
+              "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
             photoW: 88,
             photoH: 110,
             tag: "",
@@ -156,7 +162,8 @@ function cloneDefault() {
             name: "TBD",
             title: "",
             org: "",
-            photoUrl: "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
+            photoUrl:
+              "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
             photoW: 88,
             photoH: 110,
             tag: "Moderator",
@@ -166,7 +173,8 @@ function cloneDefault() {
             name: "TBD",
             title: "",
             org: "",
-            photoUrl: "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
+            photoUrl:
+              "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
             photoW: 88,
             photoH: 110,
             tag: "",
@@ -176,7 +184,8 @@ function cloneDefault() {
             name: "TBD",
             title: "",
             org: "",
-            photoUrl: "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
+            photoUrl:
+              "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
             photoW: 88,
             photoH: 110,
             tag: "",
@@ -203,6 +212,36 @@ function cloneDefault() {
       },
     ],
   };
+}
+
+function buildRegisterButtonHtml(state) {
+  if (!state.showRegisterButton || !state.registerUrl.trim()) return "";
+
+  return `
+<table width="${escapeHtml(
+    state.width
+  )}" border="0" cellspacing="0" cellpadding="0"
+       style="border-collapse:collapse; margin-top:25px; margin-bottom:5px; font-family: Arial;">
+  <tr>
+    <td align="center">
+      <a href="${escapeHtml(state.registerUrl)}"
+         target="_blank"
+         style="
+           display:inline-block;
+           background:#b90010;
+           color:#ffffff;
+           text-decoration:none;
+           font-weight:bold;
+           font-size:13pt;
+           padding:12px 28px;
+           border-radius:999px;
+           letter-spacing:0.2px;
+         ">
+        ${escapeHtml(state.registerLabel || "REGISTER")}
+      </a>
+    </td>
+  </tr>
+</table>`;
 }
 
 function buildSpeakerRow(sp) {
@@ -298,7 +337,8 @@ function buildTimetableHtml(state) {
     .map((b) => {
       if (b.type === "header") return buildHeaderBlockHtml(b.title);
       if (b.type === "simple") return buildSimpleBlockHtml(b);
-      if (b.type === "session") return buildSessionBlockHtml(b.time, b.title, b.speakers);
+      if (b.type === "session")
+        return buildSessionBlockHtml(b.time, b.title, b.speakers);
       return "";
     })
     .join("\n");
@@ -319,6 +359,7 @@ function buildTimetableHtml(state) {
 }
 
 function buildFullEmailHtml(state) {
+  const registerButton = buildRegisterButtonHtml(state);
   const timetable = buildTimetableHtml(state);
 
   const FOOTER_HTML = `
@@ -460,6 +501,8 @@ function buildFullEmailHtml(state) {
             </td>
           </tr>
         </table>
+
+        ${registerButton}
 
         ${timetable}
 
@@ -624,18 +667,45 @@ function parseHtmlToState(html) {
   const next = cloneDefault();
   const warnings = [];
 
-  const firstImg = doc.querySelector('body > table img, table img');
-  if (firstImg?.getAttribute("src")) next.bannerUrl = firstImg.getAttribute("src") || next.bannerUrl;
+  const firstImg = doc.querySelector("body > table img, table img");
+  if (firstImg?.getAttribute("src")) {
+    next.bannerUrl = firstImg.getAttribute("src") || next.bannerUrl;
+  }
 
-  const sectionBoxes = Array.from(doc.querySelectorAll("th")).reduce((acc, th) => {
-    const label = (th.textContent || "").trim().toUpperCase();
-    if (["DATE & TIME", "VENUE", "TOPIC", "DESCRIPTION", "COST", "RSVP BY", "CONTACT"].includes(label)) {
-      acc[label] = th;
-    }
-    return acc;
-  }, {});
+  const registerLink = Array.from(doc.querySelectorAll("a")).find((a) => {
+    const txt = (a.textContent || "").trim().toUpperCase();
+    return txt === "REGISTER" || txt.includes("REGISTER");
+  });
 
-  const dateTd = sectionBoxes["DATE & TIME"]?.closest("table")?.querySelectorAll("td")[0];
+  if (registerLink) {
+    next.showRegisterButton = true;
+    next.registerLabel = (registerLink.textContent || "REGISTER").trim();
+    next.registerUrl = registerLink.getAttribute("href") || "";
+  }
+
+  const sectionBoxes = Array.from(doc.querySelectorAll("th")).reduce(
+    (acc, th) => {
+      const label = (th.textContent || "").trim().toUpperCase();
+      if (
+        [
+          "DATE & TIME",
+          "VENUE",
+          "TOPIC",
+          "DESCRIPTION",
+          "COST",
+          "RSVP BY",
+          "CONTACT",
+        ].includes(label)
+      ) {
+        acc[label] = th;
+      }
+      return acc;
+    },
+    {}
+  );
+
+  const dateTd =
+    sectionBoxes["DATE & TIME"]?.closest("table")?.querySelectorAll("td")[0];
   if (dateTd) {
     const strong = dateTd.querySelector("strong");
     next.dateLine = (strong?.textContent || next.dateLine).trim();
@@ -647,16 +717,20 @@ function parseHtmlToState(html) {
     if (fullText.length > 1) next.timeLine = fullText.slice(1).join(" ");
   }
 
-  const venueTd = sectionBoxes["VENUE"]?.closest("table")?.querySelectorAll("td")[0];
+  const venueTd =
+    sectionBoxes["VENUE"]?.closest("table")?.querySelectorAll("td")[0];
   if (venueTd) next.venue = (venueTd.textContent || next.venue).trim();
 
-  const topicTd = sectionBoxes["TOPIC"]?.closest("table")?.querySelectorAll("td")[0];
+  const topicTd =
+    sectionBoxes["TOPIC"]?.closest("table")?.querySelectorAll("td")[0];
   if (topicTd) next.topicHtml = topicTd.innerHTML.trim();
 
-  const descTd = sectionBoxes["DESCRIPTION"]?.closest("table")?.querySelectorAll("td")[0];
+  const descTd =
+    sectionBoxes["DESCRIPTION"]?.closest("table")?.querySelectorAll("td")[0];
   if (descTd) next.description = (descTd.textContent || next.description).trim();
 
-  const costTd = sectionBoxes["COST"]?.closest("table")?.querySelectorAll("td")[0];
+  const costTd =
+    sectionBoxes["COST"]?.closest("table")?.querySelectorAll("td")[0];
   if (costTd) next.costHtml = costTd.innerHTML.trim();
 
   const rsvpTd = sectionBoxes["RSVP BY"]?.parentElement?.querySelector("td");
@@ -665,7 +739,9 @@ function parseHtmlToState(html) {
     next.rsvpBy = (rsvpStrong?.textContent || next.rsvpBy).trim();
     const clone = rsvpTd.cloneNode(true);
     clone.querySelectorAll("strong").forEach((el) => el.remove());
-    next.rsvpNotesHtml = clone.innerHTML.replace(/^\s*<br\s*\/?>/i, "").trim() || next.rsvpNotesHtml;
+    next.rsvpNotesHtml =
+      clone.innerHTML.replace(/^\s*<br\s*\/?>/i, "").trim() ||
+      next.rsvpNotesHtml;
   }
 
   const contactTd = sectionBoxes["CONTACT"]?.parentElement?.querySelector("td");
@@ -677,15 +753,19 @@ function parseHtmlToState(html) {
     next.contactPhone = phoneMatch ? phoneMatch[1].trim() : "";
   }
 
-  const timetableRoot = Array.from(doc.querySelectorAll("table")).find((table) => {
-    const firstTh = table.querySelector("tr > th");
-    return firstTh && (firstTh.textContent || "").trim() === "Event Timetable";
-  });
+  const timetableRoot = Array.from(doc.querySelectorAll("table")).find(
+    (table) => {
+      const firstTh = table.querySelector("tr > th");
+      return firstTh && (firstTh.textContent || "").trim() === "Event Timetable";
+    }
+  );
 
   if (timetableRoot) {
     const topTh = timetableRoot.querySelector("tr > th");
     next.timetableTitle = (topTh?.textContent || next.timetableTitle).trim();
-    const rows = Array.from(timetableRoot.querySelectorAll(":scope > tbody > tr, :scope > tr")).slice(1);
+    const rows = Array.from(
+      timetableRoot.querySelectorAll(":scope > tbody > tr, :scope > tr")
+    ).slice(1);
     const blocks = [];
 
     rows.forEach((tr) => {
@@ -708,7 +788,9 @@ function parseHtmlToState(html) {
 
         if (nestedTable) {
           const title = (nestedTable.querySelector("th")?.textContent || "").trim();
-          const speakerRows = Array.from(nestedTable.querySelectorAll(":scope > tbody > tr, :scope > tr")).slice(1);
+          const speakerRows = Array.from(
+            nestedTable.querySelectorAll(":scope > tbody > tr, :scope > tr")
+          ).slice(1);
 
           const speakers = speakerRows.map((row) => {
             const img = row.querySelector("img");
@@ -718,13 +800,18 @@ function parseHtmlToState(html) {
               ? (strongNodes[strongNodes.length - 1].textContent || "").trim()
               : "";
 
-            const cell = row.querySelector("td td:last-child") || row.querySelector("td:last-child");
+            const cell =
+              row.querySelector("td td:last-child") ||
+              row.querySelector("td:last-child");
             let titleText = "";
             let orgText = "";
 
             if (cell) {
               const pieces = cell.innerHTML
-                .replace(/<strong><span[^>]*>.*?<\/span><\/strong><br\s*\/?>?/i, "")
+                .replace(
+                  /<strong><span[^>]*>.*?<\/span><\/strong><br\s*\/?>?/i,
+                  ""
+                )
                 .replace(/<strong>.*?<\/strong><br\s*\/?>?<br\s*\/?>?/i, "")
                 .split(/<br\s*\/?>/i)
                 .map((v) => textFromHtml(v))
@@ -779,16 +866,26 @@ function parseHtmlToState(html) {
           time,
           label,
           bold: !!secondTd.querySelector("strong"),
-          highlight: /#FEFBE9/i.test((tds[0].getAttribute("style") || "") + secondStyle),
-          centerLabel: /text-align\s*:\s*center/i.test(secondStyle) || align.toLowerCase() === "center",
+          highlight: /#FEFBE9/i.test(
+            (tds[0].getAttribute("style") || "") + secondStyle
+          ),
+          centerLabel:
+            /text-align\s*:\s*center/i.test(secondStyle) ||
+            align.toLowerCase() === "center",
         });
       }
     });
 
     if (blocks.length) next.blocks = blocks;
-    else warnings.push("Timetable blocks could not be fully parsed, so the current template was kept.");
+    else {
+      warnings.push(
+        "Timetable blocks could not be fully parsed, so the current template was kept."
+      );
+    }
   } else {
-    warnings.push("Event timetable table was not found, so the current timetable template was kept.");
+    warnings.push(
+      "Event timetable table was not found, so the current timetable template was kept."
+    );
   }
 
   return { state: next, warnings };
@@ -1030,7 +1127,9 @@ function Input(props) {
 }
 
 function TextArea(props) {
-  return <textarea {...props} style={{ ...styles.textarea, ...(props.style || {}) }} />;
+  return (
+    <textarea {...props} style={{ ...styles.textarea, ...(props.style || {}) }} />
+  );
 }
 
 function Button({ children, onClick, danger = false, disabled = false, title }) {
@@ -1110,16 +1209,22 @@ function InteractivePreview({ state, setState }) {
     [data-editable="true"] { outline: 1px dashed transparent; outline-offset: 2px; cursor: text; transition: outline-color .15s ease, background-color .15s ease; }
     [data-editable="true"]:hover { outline-color:#94a3b8; background:#f8fafc; }
     [data-editable="true"]:focus { outline:2px solid #334155; background:#fff; }
-    .hint { width:${escapeHtml(state.width)}px; margin:0 auto 14px; color:#64748b; font-size:12px; }
+    .hint { width:${escapeHtml(
+      state.width
+    )}px; margin:0 auto 14px; color:#64748b; font-size:12px; }
   </style>
 </head>
 <body>
-  <div class="hint">Click text in the preview to edit. Header titles, session titles, and speaker name/title/organization sync too.</div>
+  <div class="hint">Click text in the preview to edit. Changes save when you click away, so typing feels more natural.</div>
   <div class="frame">
-    <table width="${escapeHtml(state.width)}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin:0 auto;">
+    <table width="${escapeHtml(
+      state.width
+    )}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin:0 auto;">
       <tr>
         <td>
-          <table width="${escapeHtml(state.width)}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-bottom:25px;">
+          <table width="${escapeHtml(
+            state.width
+          )}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-bottom:25px;">
             <tr>
               <td align="center" style="padding:0;">
                 <img src="${escapeHtml(state.bannerUrl)}" alt="" width="${escapeHtml(
@@ -1129,7 +1234,9 @@ function InteractivePreview({ state, setState }) {
             </tr>
           </table>
 
-          <table width="${escapeHtml(state.width)}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-top:50px;">
+          <table width="${escapeHtml(
+            state.width
+          )}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-top:50px;">
             <tr>
               <td width="400" valign="top" style="padding-right:15px;">
                 <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; color:#000; font-family: Arial;">
@@ -1166,7 +1273,9 @@ function InteractivePreview({ state, setState }) {
             </tr>
           </table>
 
-          <table width="${escapeHtml(state.width)}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-top:25px; color:#000; font-family: Arial;">
+          <table width="${escapeHtml(
+            state.width
+          )}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-top:25px; color:#000; font-family: Arial;">
             <tr>
               <th align="left" height="35" style="background:#fff; padding-left:10px; color:#c11f2d; font-size:14pt;">TOPIC</th>
             </tr>
@@ -1179,7 +1288,9 @@ function InteractivePreview({ state, setState }) {
             </tr>
           </table>
 
-          <table width="${escapeHtml(state.width)}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-top:25px; color:#000; font-family: Arial;">
+          <table width="${escapeHtml(
+            state.width
+          )}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-top:25px; color:#000; font-family: Arial;">
             <tr>
               <th align="left" height="35" style="background:#fff; padding-left:10px; color:#c11f2d; font-size:14pt;">DESCRIPTION</th>
             </tr>
@@ -1190,7 +1301,9 @@ function InteractivePreview({ state, setState }) {
             </tr>
           </table>
 
-          <table width="${escapeHtml(state.width)}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-top:25px; color:#000; font-family: Arial;">
+          <table width="${escapeHtml(
+            state.width
+          )}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-top:25px; color:#000; font-family: Arial;">
             <tr>
               <th align="left" height="35" style="background:#fff; padding-left:10px; color:#c11f2d; font-size:14pt;">COST</th>
             </tr>
@@ -1203,9 +1316,13 @@ function InteractivePreview({ state, setState }) {
             </tr>
           </table>
 
+          ${buildRegisterButtonHtml(state)}
+
           ${buildInteractiveTimetableHtml(state)}
 
-          <table width="${escapeHtml(state.width)}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-top:20px; font-family: Arial;">
+          <table width="${escapeHtml(
+            state.width
+          )}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-top:20px; font-family: Arial;">
             <tr style="font-size:10pt;">
               <td colspan="4">
                 <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; border-top:2px solid #666; border-bottom:1px solid #d3d3d3;">
@@ -1248,7 +1365,9 @@ function InteractivePreview({ state, setState }) {
             </tr>
           </table>
 
-          <table width="${escapeHtml(state.width)}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; font-family: Arial; margin-top:20px;">
+          <table width="${escapeHtml(
+            state.width
+          )}" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; font-family: Arial; margin-top:20px;">
             <tr style="font-size:10pt; font-family: Arial;">
               <td align="center" style="padding-top:30px; padding-bottom:15px; padding-left:20px; padding-right:20px;">
                 50F, Three IFC, 10, Gukjegeumyung-ro, Yeongdeungpo-gu, Seoul, Korea<br />
@@ -1294,7 +1413,7 @@ function InteractivePreview({ state, setState }) {
       const blockId = el.dataset.blockId;
       const speakerId = el.dataset.speakerId;
 
-      el.addEventListener('input', () => {
+      const commit = () => {
         const value = mode === 'html' ? toHtml(el) : toPlain(el);
         if (kind === 'speaker') {
           sendSpeaker(blockId, speakerId, field, value);
@@ -1302,6 +1421,15 @@ function InteractivePreview({ state, setState }) {
           sendBlock(blockId, field, value);
         } else {
           sendField(field, value);
+        }
+      };
+
+      el.addEventListener('blur', commit);
+
+      el.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          commit();
         }
       });
     });
@@ -1319,7 +1447,11 @@ function InteractivePreview({ state, setState }) {
         return;
       }
 
-      if (data.type === "amcham-inline-block-edit" && data.blockId && data.field) {
+      if (
+        data.type === "amcham-inline-block-edit" &&
+        data.blockId &&
+        data.field
+      ) {
         setState((s) => ({
           ...s,
           blocks: (s.blocks || []).map((b) =>
@@ -1343,7 +1475,9 @@ function InteractivePreview({ state, setState }) {
               : {
                   ...b,
                   speakers: (b.speakers || []).map((sp) =>
-                    sp.id === data.speakerId ? { ...sp, [data.field]: data.value } : sp
+                    sp.id === data.speakerId
+                      ? { ...sp, [data.field]: data.value }
+                      : sp
                   ),
                 }
           ),
@@ -1358,7 +1492,8 @@ function InteractivePreview({ state, setState }) {
   return (
     <div>
       <div style={styles.notice}>
-        Click directly on the text inside the preview to edit. Header titles, session titles, and speaker name/title/organization sync too.
+        Click directly on the text inside the preview to edit. Changes save when
+        you click away, so typing feels more natural.
       </div>
       <div style={styles.previewWrap}>
         <iframe
@@ -1384,10 +1519,11 @@ export default function App() {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : cloneDefault();
   });
-  const [selectedBlockId, setSelectedBlockId] = useState(state.blocks[0]?.id || null);
+  const [selectedBlockId, setSelectedBlockId] = useState(
+    state.blocks[0]?.id || null
+  );
   const [previewMode, setPreviewMode] = useState("interactive");
   const [importHtmlText, setImportHtmlText] = useState("");
-  const [jsonText, setJsonText] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
 
   useEffect(() => {
@@ -1400,7 +1536,8 @@ export default function App() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
-  const selectedBlock = state.blocks.find((b) => b.id === selectedBlockId) || null;
+  const selectedBlock =
+    state.blocks.find((b) => b.id === selectedBlockId) || null;
 
   const timetableHtml = useMemo(() => buildTimetableHtml(state).trim(), [state]);
   const fullEmailHtml = useMemo(() => buildFullEmailHtml(state).trim(), [state]);
@@ -1451,7 +1588,8 @@ export default function App() {
                 name: "New Speaker",
                 title: "Title",
                 org: "Organization",
-                photoUrl: "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
+                photoUrl:
+                  "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
                 photoW: 88,
                 photoH: 110,
                 tag: "",
@@ -1548,41 +1686,6 @@ export default function App() {
     }
   };
 
-  const exportJson = () => {
-    const txt = JSON.stringify(state, null, 2);
-    setJsonText(txt);
-    copy(txt, "JSON backup");
-  };
-
-  const importJson = () => {
-    try {
-      const parsed = JSON.parse(jsonText);
-      if (!parsed || !Array.isArray(parsed.blocks)) {
-        throw new Error("Invalid JSON format.");
-      }
-      const next = {
-        ...cloneDefault(),
-        ...parsed,
-        blocks: (parsed.blocks || []).map((b) => ({
-          ...b,
-          id: b.id || uid(),
-          speakers: (b.speakers || []).map((sp) => ({
-            photoW: 88,
-            photoH: 110,
-            tag: "",
-            ...sp,
-            id: sp.id || uid(),
-          })),
-        })),
-      };
-      setState(next);
-      setSelectedBlockId(next.blocks[0]?.id || null);
-      setStatusMessage("JSON imported successfully.");
-    } catch (err) {
-      alert(`JSON import failed: ${err.message}`);
-    }
-  };
-
   const gridTwo = {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
@@ -1596,7 +1699,8 @@ export default function App() {
           <div>
             <div style={styles.headerTitle}>AMCHAM Full Email Editor</div>
             <div style={styles.headerSub}>
-              Edit event info, manage timetable blocks, import modified HTML, and update text directly in the preview.
+              Edit event info, manage timetable blocks, import modified HTML,
+              and update text directly in the preview.
             </div>
           </div>
           <div style={styles.topButtons}>
@@ -1610,11 +1714,12 @@ export default function App() {
           </div>
         </div>
 
-        {statusMessage ? <div style={{ ...styles.notice, marginBottom: 18 }}>{statusMessage}</div> : null}
+        {statusMessage ? (
+          <div style={{ ...styles.notice, marginBottom: 18 }}>{statusMessage}</div>
+        ) : null}
 
         <div style={styles.layout}>
           <div>
-
             <Card title="Event Info">
               <Field label="Banner image URL">
                 <Input
@@ -1669,6 +1774,47 @@ export default function App() {
                 />
               </Field>
 
+              <Field label="Register button">
+                <label
+                  style={{
+                    fontSize: 14,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!state.showRegisterButton}
+                    onChange={(e) =>
+                      setField("showRegisterButton", e.target.checked)
+                    }
+                  />
+                  Show REGISTER button between Cost and Event Timetable
+                </label>
+              </Field>
+
+              {state.showRegisterButton ? (
+                <>
+                  <Field label="Register button label">
+                    <Input
+                      value={state.registerLabel}
+                      onChange={(e) =>
+                        setField("registerLabel", e.target.value)
+                      }
+                    />
+                  </Field>
+
+                  <Field label="Register button URL">
+                    <Input
+                      value={state.registerUrl}
+                      onChange={(e) => setField("registerUrl", e.target.value)}
+                      placeholder="https://example.com/register"
+                    />
+                  </Field>
+                </>
+              ) : null}
+
               <div style={gridTwo}>
                 <Field label="RSVP by">
                   <Input
@@ -1712,26 +1858,48 @@ export default function App() {
             >
               {state.blocks.map((b, idx) => {
                 const typeLabel =
-                  b.type === "header" ? "Header" : b.type === "simple" ? "Row" : "Session";
+                  b.type === "header"
+                    ? "Header"
+                    : b.type === "simple"
+                    ? "Row"
+                    : "Session";
 
                 const subtitle =
                   b.type === "header"
                     ? ""
                     : b.type === "simple"
                     ? `${b.time || "(no time)"} · ${b.label}`
-                    : `${b.time || "(no time)"} · ${(b.speakers || []).length} speakers`;
+                    : `${b.time || "(no time)"} · ${
+                        (b.speakers || []).length
+                      } speakers`;
 
                 const tagStyle =
                   b.type === "header"
-                    ? { ...styles.blockTag, background: "#fef3c7", color: "#92400e" }
+                    ? {
+                        ...styles.blockTag,
+                        background: "#fef3c7",
+                        color: "#92400e",
+                      }
                     : b.type === "simple"
-                    ? { ...styles.blockTag, background: "#e2e8f0", color: "#334155" }
-                    : { ...styles.blockTag, background: "#dbeafe", color: "#1d4ed8" };
+                    ? {
+                        ...styles.blockTag,
+                        background: "#e2e8f0",
+                        color: "#334155",
+                      }
+                    : {
+                        ...styles.blockTag,
+                        background: "#dbeafe",
+                        color: "#1d4ed8",
+                      };
 
                 return (
                   <div
                     key={b.id}
-                    style={b.id === selectedBlockId ? styles.listItemSelected : styles.listItem}
+                    style={
+                      b.id === selectedBlockId
+                        ? styles.listItemSelected
+                        : styles.listItem
+                    }
                   >
                     <button
                       type="button"
@@ -1747,57 +1915,49 @@ export default function App() {
                       <div style={{ marginBottom: 4 }}>
                         <span style={tagStyle}>{typeLabel}</span>
                         <span style={{ fontSize: 14, fontWeight: 700 }}>
-                          {b.type === "header" ? b.title : b.type === "simple" ? b.label : b.title}
+                          {b.type === "header"
+                            ? b.title
+                            : b.type === "simple"
+                            ? b.label
+                            : b.title}
                         </span>
                       </div>
-                      {subtitle ? <div style={{ fontSize: 12, color: "#64748b" }}>{subtitle}</div> : null}
+                      {subtitle ? (
+                        <div style={{ fontSize: 12, color: "#64748b" }}>
+                          {subtitle}
+                        </div>
+                      ) : null}
                     </button>
 
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <GhostButton disabled={idx === 0} onClick={() => moveBlock(b.id, "up")}>↑</GhostButton>
-                      <GhostButton disabled={idx === state.blocks.length - 1} onClick={() => moveBlock(b.id, "down")}>↓</GhostButton>
-                      <Button danger onClick={() => deleteBlock(b.id)}>Delete</Button>
+                      <GhostButton
+                        disabled={idx === 0}
+                        onClick={() => moveBlock(b.id, "up")}
+                      >
+                        ↑
+                      </GhostButton>
+                      <GhostButton
+                        disabled={idx === state.blocks.length - 1}
+                        onClick={() => moveBlock(b.id, "down")}
+                      >
+                        ↓
+                      </GhostButton>
+                      <Button danger onClick={() => deleteBlock(b.id)}>
+                        Delete
+                      </Button>
                     </div>
                   </div>
                 );
               })}
-            </Card>
-
-            <Card title="Import / Export">
-              <Field label="Paste modified HTML" hint="Bring an externally edited HTML back into the editor">
-                <TextArea
-                  rows={12}
-                  value={importHtmlText}
-                  onChange={(e) => setImportHtmlText(e.target.value)}
-                />
-              </Field>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-                <Button onClick={importHtml}>Import HTML</Button>
-                <GhostButton onClick={() => setImportHtmlText("")}>Clear</GhostButton>
-              </div>
-              <div style={{ ...styles.smallText, marginBottom: 16 }}>
-                Best results come from HTML that follows this editor’s table structure. If the structure changed a lot, some parts may stay on the current template.
-              </div>
-
-              <Field label="JSON backup" hint="Most reliable save/restore format">
-                <TextArea
-                  rows={10}
-                  value={jsonText}
-                  onChange={(e) => setJsonText(e.target.value)}
-                />
-              </Field>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <Button onClick={exportJson}>Export JSON</Button>
-                <GhostButton onClick={importJson}>Import JSON</GhostButton>
-                <GhostButton onClick={() => setJsonText("")}>Clear</GhostButton>
-              </div>
             </Card>
           </div>
 
           <div>
             <Card title="Section Editor">
               {!selectedBlock ? (
-                <div style={styles.hintBox}>Select a section on the left, or add a new one.</div>
+                <div style={styles.hintBox}>
+                  Select a section on the left, or add a new one.
+                </div>
               ) : (
                 <div>
                   <div style={{ ...styles.fieldLabelRow, marginBottom: 14 }}>
@@ -1807,12 +1967,21 @@ export default function App() {
                       onChange={(t) => {
                         if (t === selectedBlock.type) return;
                         if (t === "header") {
-                          updateBlock({ type: "header", title: selectedBlock.title || selectedBlock.label || "New Header" });
+                          updateBlock({
+                            type: "header",
+                            title:
+                              selectedBlock.title ||
+                              selectedBlock.label ||
+                              "New Header",
+                          });
                         } else if (t === "simple") {
                           updateBlock({
                             type: "simple",
                             time: selectedBlock.time || "",
-                            label: selectedBlock.title || selectedBlock.label || "New Row",
+                            label:
+                              selectedBlock.title ||
+                              selectedBlock.label ||
+                              "New Row",
                             bold: !!selectedBlock.bold,
                             highlight: !!selectedBlock.highlight,
                             centerLabel: !!selectedBlock.centerLabel,
@@ -1821,7 +1990,10 @@ export default function App() {
                           updateBlock({
                             type: "session",
                             time: selectedBlock.time || "",
-                            title: selectedBlock.title || selectedBlock.label || "New Session",
+                            title:
+                              selectedBlock.title ||
+                              selectedBlock.label ||
+                              "New Session",
                             speakers:
                               selectedBlock.speakers || [
                                 {
@@ -1829,7 +2001,8 @@ export default function App() {
                                   name: "New Speaker",
                                   title: "Title",
                                   org: "Organization",
-                                  photoUrl: "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
+                                  photoUrl:
+                                    "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
                                   photoW: 88,
                                   photoH: 110,
                                   tag: "",
@@ -1848,23 +2021,70 @@ export default function App() {
 
                   {selectedBlock.type === "header" ? (
                     <Field label="Header title">
-                      <Input value={selectedBlock.title} onChange={(e) => updateBlock({ title: e.target.value })} />
+                      <Input
+                        value={selectedBlock.title}
+                        onChange={(e) => updateBlock({ title: e.target.value })}
+                      />
                     </Field>
                   ) : null}
 
                   {selectedBlock.type === "simple" ? (
                     <div>
                       <Field label="Time">
-                        <Input value={selectedBlock.time} onChange={(e) => updateBlock({ time: e.target.value })} />
+                        <Input
+                          value={selectedBlock.time}
+                          onChange={(e) => updateBlock({ time: e.target.value })}
+                        />
                       </Field>
                       <Field label="Label">
-                        <Input value={selectedBlock.label} onChange={(e) => updateBlock({ label: e.target.value })} />
+                        <Input
+                          value={selectedBlock.label}
+                          onChange={(e) =>
+                            updateBlock({ label: e.target.value })
+                          }
+                        />
                       </Field>
                       <Field label="Style">
-                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                          <label style={{ fontSize: 14 }}><input type="checkbox" checked={!!selectedBlock.bold} onChange={(e) => updateBlock({ bold: e.target.checked })} style={{ marginRight: 8 }} />Bold</label>
-                          <label style={{ fontSize: 14 }}><input type="checkbox" checked={!!selectedBlock.highlight} onChange={(e) => updateBlock({ highlight: e.target.checked })} style={{ marginRight: 8 }} />Highlight</label>
-                          <label style={{ fontSize: 14 }}><input type="checkbox" checked={!!selectedBlock.centerLabel} onChange={(e) => updateBlock({ centerLabel: e.target.checked })} style={{ marginRight: 8 }} />Center label</label>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 10,
+                          }}
+                        >
+                          <label style={{ fontSize: 14 }}>
+                            <input
+                              type="checkbox"
+                              checked={!!selectedBlock.bold}
+                              onChange={(e) =>
+                                updateBlock({ bold: e.target.checked })
+                              }
+                              style={{ marginRight: 8 }}
+                            />
+                            Bold
+                          </label>
+                          <label style={{ fontSize: 14 }}>
+                            <input
+                              type="checkbox"
+                              checked={!!selectedBlock.highlight}
+                              onChange={(e) =>
+                                updateBlock({ highlight: e.target.checked })
+                              }
+                              style={{ marginRight: 8 }}
+                            />
+                            Highlight
+                          </label>
+                          <label style={{ fontSize: 14 }}>
+                            <input
+                              type="checkbox"
+                              checked={!!selectedBlock.centerLabel}
+                              onChange={(e) =>
+                                updateBlock({ centerLabel: e.target.checked })
+                              }
+                              style={{ marginRight: 8 }}
+                            />
+                            Center label
+                          </label>
                         </div>
                       </Field>
                     </div>
@@ -1873,19 +2093,31 @@ export default function App() {
                   {selectedBlock.type === "session" ? (
                     <div>
                       <Field label="Time">
-                        <Input value={selectedBlock.time} onChange={(e) => updateBlock({ time: e.target.value })} />
+                        <Input
+                          value={selectedBlock.time}
+                          onChange={(e) => updateBlock({ time: e.target.value })}
+                        />
                       </Field>
                       <Field label="Session title">
-                        <Input value={selectedBlock.title} onChange={(e) => updateBlock({ title: e.target.value })} />
+                        <Input
+                          value={selectedBlock.title}
+                          onChange={(e) =>
+                            updateBlock({ title: e.target.value })
+                          }
+                        />
                       </Field>
 
                       <div style={{ ...styles.fieldLabelRow, marginBottom: 10 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700 }}>Speakers</div>
+                        <div style={{ fontSize: 14, fontWeight: 700 }}>
+                          Speakers
+                        </div>
                         <Button onClick={addSpeaker}>+ Add Speaker</Button>
                       </div>
 
                       {(selectedBlock.speakers || []).length === 0 ? (
-                        <div style={styles.hintBox}>No speakers yet. Click Add Speaker.</div>
+                        <div style={styles.hintBox}>
+                          No speakers yet. Click Add Speaker.
+                        </div>
                       ) : null}
 
                       {(selectedBlock.speakers || []).map((sp, idx) => (
@@ -1909,38 +2141,120 @@ export default function App() {
                             }}
                           >
                             <div>
-                              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{sp.name || "(no name)"}</div>
-                              <div style={{ fontSize: 12, color: "#64748b" }}>{sp.title || ""} {sp.title && sp.org ? "·" : ""} {sp.org || ""}</div>
-                              {sp.tag ? <div style={{ fontSize: 11, color: "#be123c", marginTop: 4 }}>{sp.tag}</div> : null}
+                              <div
+                                style={{
+                                  fontSize: 14,
+                                  fontWeight: 700,
+                                  marginBottom: 4,
+                                }}
+                              >
+                                {sp.name || "(no name)"}
+                              </div>
+                              <div style={{ fontSize: 12, color: "#64748b" }}>
+                                {sp.title || ""}{" "}
+                                {sp.title && sp.org ? "·" : ""} {sp.org || ""}
+                              </div>
+                              {sp.tag ? (
+                                <div
+                                  style={{
+                                    fontSize: 11,
+                                    color: "#be123c",
+                                    marginTop: 4,
+                                  }}
+                                >
+                                  {sp.tag}
+                                </div>
+                              ) : null}
                             </div>
                             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                              <GhostButton disabled={idx === 0} onClick={() => moveSpeaker(sp.id, "up")}>↑</GhostButton>
-                              <GhostButton disabled={idx === (selectedBlock.speakers || []).length - 1} onClick={() => moveSpeaker(sp.id, "down")}>↓</GhostButton>
-                              <Button danger onClick={() => deleteSpeaker(sp.id)}>Delete</Button>
+                              <GhostButton
+                                disabled={idx === 0}
+                                onClick={() => moveSpeaker(sp.id, "up")}
+                              >
+                                ↑
+                              </GhostButton>
+                              <GhostButton
+                                disabled={
+                                  idx ===
+                                  (selectedBlock.speakers || []).length - 1
+                                }
+                                onClick={() => moveSpeaker(sp.id, "down")}
+                              >
+                                ↓
+                              </GhostButton>
+                              <Button
+                                danger
+                                onClick={() => deleteSpeaker(sp.id)}
+                              >
+                                Delete
+                              </Button>
                             </div>
                           </div>
 
                           <Field label="Tag (optional: Moderator)">
-                            <Input value={sp.tag || ""} onChange={(e) => updateSpeaker(sp.id, { tag: e.target.value })} />
+                            <Input
+                              value={sp.tag || ""}
+                              onChange={(e) =>
+                                updateSpeaker(sp.id, { tag: e.target.value })
+                              }
+                            />
                           </Field>
                           <Field label="Name">
-                            <Input value={sp.name || ""} onChange={(e) => updateSpeaker(sp.id, { name: e.target.value })} />
+                            <Input
+                              value={sp.name || ""}
+                              onChange={(e) =>
+                                updateSpeaker(sp.id, { name: e.target.value })
+                              }
+                            />
                           </Field>
                           <Field label="Title">
-                            <Input value={sp.title || ""} onChange={(e) => updateSpeaker(sp.id, { title: e.target.value })} />
+                            <Input
+                              value={sp.title || ""}
+                              onChange={(e) =>
+                                updateSpeaker(sp.id, { title: e.target.value })
+                              }
+                            />
                           </Field>
                           <Field label="Organization">
-                            <Input value={sp.org || ""} onChange={(e) => updateSpeaker(sp.id, { org: e.target.value })} />
+                            <Input
+                              value={sp.org || ""}
+                              onChange={(e) =>
+                                updateSpeaker(sp.id, { org: e.target.value })
+                              }
+                            />
                           </Field>
                           <Field label="Photo URL">
-                            <Input value={sp.photoUrl || ""} onChange={(e) => updateSpeaker(sp.id, { photoUrl: e.target.value })} />
+                            <Input
+                              value={sp.photoUrl || ""}
+                              onChange={(e) =>
+                                updateSpeaker(sp.id, {
+                                  photoUrl: e.target.value,
+                                })
+                              }
+                            />
                           </Field>
                           <div style={gridTwo}>
                             <Field label="Photo width">
-                              <Input type="number" value={sp.photoW || 88} onChange={(e) => updateSpeaker(sp.id, { photoW: Number(e.target.value || 88) })} />
+                              <Input
+                                type="number"
+                                value={sp.photoW || 88}
+                                onChange={(e) =>
+                                  updateSpeaker(sp.id, {
+                                    photoW: Number(e.target.value || 88),
+                                  })
+                                }
+                              />
                             </Field>
                             <Field label="Photo height">
-                              <Input type="number" value={sp.photoH || 110} onChange={(e) => updateSpeaker(sp.id, { photoH: Number(e.target.value || 110) })} />
+                              <Input
+                                type="number"
+                                value={sp.photoH || 110}
+                                onChange={(e) =>
+                                  updateSpeaker(sp.id, {
+                                    photoH: Number(e.target.value || 110),
+                                  })
+                                }
+                              />
                             </Field>
                           </div>
                         </div>
@@ -1950,7 +2264,7 @@ export default function App() {
                 </div>
               )}
             </Card>
-            
+
             <Card title="Exported HTML">
               <Field label="Timetable only">
                 <TextArea value={timetableHtml} readOnly rows={10} />
@@ -1958,6 +2272,37 @@ export default function App() {
               <Field label="Full email">
                 <TextArea value={fullEmailHtml} readOnly rows={14} />
               </Field>
+            </Card>
+
+            <Card title="Import / Export">
+              <Field
+                label="Paste modified HTML"
+                hint="Bring an externally edited HTML back into the editor"
+              >
+                <TextArea
+                  rows={12}
+                  value={importHtmlText}
+                  onChange={(e) => setImportHtmlText(e.target.value)}
+                />
+              </Field>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  marginBottom: 14,
+                }}
+              >
+                <Button onClick={importHtml}>Import HTML</Button>
+                <GhostButton onClick={() => setImportHtmlText("")}>
+                  Clear
+                </GhostButton>
+              </div>
+              <div style={styles.smallText}>
+                Best results come from HTML that follows this editor’s table
+                structure. If the structure changed a lot, some parts may stay on
+                the current template.
+              </div>
             </Card>
           </div>
 
