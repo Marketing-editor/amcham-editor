@@ -12,7 +12,7 @@ import React, { useEffect, useMemo, useState } from "react";
  */
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const STORAGE_KEY = "amcham_full_email_editor_pretty_v6";
+const STORAGE_KEY = "amcham_full_email_editor_pretty_v7";
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -378,7 +378,7 @@ function buildTimetableHtml(state) {
   const blocksHtml = (state.blocks || [])
     .map((b) => {
       if (b.type === "header") return buildHeaderBlockHtml(b.title);
-      if (b.type === "simple") return buildSimpleBlockHtml(b);
+      if (b.type === "simple") return buildInteractiveSimpleBlockHtml(b);
       if (b.type === "session")
         return buildSessionBlockHtml(b.time, b.title, b.speakers);
       return "";
@@ -663,7 +663,9 @@ function buildInteractiveSessionBlockHtml(block) {
 <tr style="font-size:11pt;">
   <td width="20%" align="center" valign="middle"
       style="background:#fff; border-top:1px solid #dddddd; border-right:1px solid #dddddd; padding:5px;">
-    <strong>${escapeHtml(block.time || "")}</strong>
+    <strong contenteditable="true" data-editable="true" data-kind="block" data-block-id="${escapeHtml(
+            block.id
+          )}" data-field="time">${escapeHtml(block.time || "")}</strong>
   </td>
   <td colspan="3" style="border-top:1px solid #dddddd; padding:0;">
     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; font-family: Arial;">
@@ -683,6 +685,41 @@ function buildInteractiveSessionBlockHtml(block) {
       </tr>
       ${speakersHtml}
     </table>
+  </td>
+</tr>`;
+}
+
+function buildInteractiveSimpleBlockHtml(block) {
+  const leftStyle =
+    "background:" +
+    (block.highlight ? "#FEFBE9" : "#fff") +
+    "; border-top:1px solid #dddddd; border-right:1px solid #dddddd; padding:10px; font-family:Arial;";
+
+  const rightBase =
+    "border-top:1px solid #dddddd; padding-left:15px;" +
+    (block.centerLabel ? " text-align:center;" : "") +
+    " font-size:10.5pt;";
+
+  const rightStyle =
+    "background:" + (block.highlight ? "#FEFBE9" : "#fff") + "; " + rightBase;
+
+  const labelInner = block.bold
+    ? `<strong contenteditable="true" data-editable="true" data-kind="block" data-block-id="${escapeHtml(
+        block.id
+      )}" data-field="label">${escapeHtml(block.label || "")}</strong>`
+    : `<span contenteditable="true" data-editable="true" data-kind="block" data-block-id="${escapeHtml(
+        block.id
+      )}" data-field="label">${escapeHtml(block.label || "")}</span>`;
+
+  return `
+<tr style="font-size:11pt;">
+  <td width="20%" align="center" valign="middle" style="${leftStyle}">
+    <strong contenteditable="true" data-editable="true" data-kind="block" data-block-id="${escapeHtml(
+      block.id
+    )}" data-field="time">${escapeHtml(block.time || "")}</strong>
+  </td>
+  <td colspan="3" align="left" valign="middle" style="${rightStyle}">
+    ${labelInner}
   </td>
 </tr>`;
 }
@@ -709,7 +746,7 @@ function buildInteractiveTimetableHtml(state) {
   const blocksHtml = (state.blocks || [])
     .map((b) => {
       if (b.type === "header") return buildInteractiveHeaderBlockHtml(b);
-      if (b.type === "simple") return buildSimpleBlockHtml(b);
+      if (b.type === "simple") return buildInteractiveSimpleBlockHtml(b);
       if (b.type === "session") return buildInteractiveSessionBlockHtml(b);
       return "";
     })
@@ -1618,8 +1655,12 @@ function InteractivePreview({ state, setState }) {
 
 export default function App() {
   const [state, setState] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : cloneDefault();
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : cloneDefault();
+    } catch {
+      return cloneDefault();
+    }
   });
   const [selectedBlockId, setSelectedBlockId] = useState(
     state.blocks[0]?.id || null
@@ -1654,6 +1695,23 @@ export default function App() {
       setStatusMessage(`${label} copied.`);
     } catch {
       alert("Copy failed. You can manually select and copy from the textarea.");
+    }
+  };
+
+  const downloadHtml = (text, filename) => {
+    try {
+      const blob = new Blob([text], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setStatusMessage(`${filename} downloaded.`);
+    } catch {
+      alert("Download failed.");
     }
   };
 
@@ -1811,6 +1869,13 @@ export default function App() {
             </GhostButton>
             <Button onClick={() => copy(fullEmailHtml, "Full Email HTML")}>
               Copy Full Email
+            </Button>
+            <Button
+              onClick={() =>
+                downloadHtml(fullEmailHtml, "amcham-full-email.html")
+              }
+            >
+              Download Full HTML
             </Button>
             <Button danger onClick={resetToDefault}>Reset</Button>
           </div>
