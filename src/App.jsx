@@ -12,7 +12,7 @@ import React, { useEffect, useMemo, useState } from "react";
  */
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const STORAGE_KEY = "amcham_full_email_editor_pretty_v7";
+const STORAGE_KEY = "amcham_full_email_editor_pretty_v8";
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -48,11 +48,13 @@ function spacerTable(width, height) {
 </table>`;
 }
 
+
 function cloneDefault() {
   return {
     width: 800,
     tableFont: "Arial",
     bannerUrl: "웹배너 링크 넣기",
+
     dateLine: "Day, Month date, 2026",
     timeLine: "0:00 am - 0:00 pm",
     venue: "TBD",
@@ -60,15 +62,19 @@ function cloneDefault() {
     description: "TBD",
     costHtml:
       "• Member Companies: KRW 00 per admission<br>• Non-Member Companies: KRW 00 per admission",
+
     showRegisterButton: false,
     registerLabel: "REGISTER",
     registerUrl: "",
+
     rsvpBy: "TBD",
     rsvpNotesHtml:
       "* Registration must be completed in advance.<br>* Free cancelations will be accepted only until TBD (12pm noon).",
     contactEmail: "rsvp@amchamkorea.org",
     contactPhone: "",
+
     timetableTitle: "Event Timetable",
+
     blocks: [
       {
         id: uid(),
@@ -79,7 +85,13 @@ function cloneDefault() {
         highlight: false,
         centerLabel: false,
       },
-      { id: uid(), type: "header", title: "Program Opening" },
+
+      {
+        id: uid(),
+        type: "header",
+        title: "Program Opening",
+      },
+
       {
         id: uid(),
         type: "session",
@@ -99,6 +111,7 @@ function cloneDefault() {
           },
         ],
       },
+
       {
         id: uid(),
         type: "session",
@@ -111,13 +124,14 @@ function cloneDefault() {
             title: "",
             org: "",
             photoUrl:
-              "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
+              "https://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
             photoW: 88,
             photoH: 110,
             tag: "",
           },
         ],
       },
+
       {
         id: uid(),
         type: "session",
@@ -130,14 +144,20 @@ function cloneDefault() {
             title: "",
             org: "",
             photoUrl:
-              "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
+              "https://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
             photoW: 88,
             photoH: 110,
             tag: "",
           },
         ],
       },
-      { id: uid(), type: "header", title: "Session 1." },
+
+      {
+        id: uid(),
+        type: "header",
+        title: "Session 1.",
+      },
+
       {
         id: uid(),
         type: "session",
@@ -150,13 +170,14 @@ function cloneDefault() {
             title: "",
             org: "",
             photoUrl:
-              "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
+              "https://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
             photoW: 88,
             photoH: 110,
             tag: "",
           },
         ],
       },
+
       {
         id: uid(),
         type: "simple",
@@ -166,7 +187,13 @@ function cloneDefault() {
         highlight: false,
         centerLabel: true,
       },
-      { id: uid(), type: "header", title: "Panel Discussion" },
+
+      {
+        id: uid(),
+        type: "header",
+        title: "Panel Discussion",
+      },
+
       {
         id: uid(),
         type: "session",
@@ -179,7 +206,7 @@ function cloneDefault() {
             title: "",
             org: "",
             photoUrl:
-              "http://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
+              "https://amchamkorea.org/flyer/2026/Meeting/0421 DBIK/Blank.PNG",
             photoW: 88,
             photoH: 110,
             tag: "Moderator",
@@ -208,6 +235,7 @@ function cloneDefault() {
           },
         ],
       },
+
       {
         id: uid(),
         type: "simple",
@@ -217,6 +245,7 @@ function cloneDefault() {
         highlight: true,
         centerLabel: true,
       },
+
       {
         id: uid(),
         type: "simple",
@@ -229,6 +258,7 @@ function cloneDefault() {
     ],
   };
 }
+
 
 /* -------------------- Email HTML builders -------------------- */
 
