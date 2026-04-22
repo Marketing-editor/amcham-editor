@@ -12,7 +12,7 @@ import React, { useEffect, useMemo, useState } from "react";
  */
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const STORAGE_KEY = "amcham_full_email_editor_pretty_v8";
+const STORAGE_KEY = "amcham_full_email_editor_pretty_v10";
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -79,7 +79,7 @@ function cloneDefault() {
       {
         id: uid(),
         type: "simple",
-        time: "8:30am - 9:00am",
+        time: "8:30am – 9:00am",
         label: "Registration & Networking",
         bold: true,
         highlight: false,
@@ -161,7 +161,7 @@ function cloneDefault() {
       {
         id: uid(),
         type: "session",
-        time: "0:00am - 0:00am",
+        time: "0:00am – 0:00am",
         title: "Presentation 1",
         speakers: [
           {
@@ -181,7 +181,7 @@ function cloneDefault() {
       {
         id: uid(),
         type: "simple",
-        time: "0:00am - 0:00am",
+        time: "0:00am – 0:00am",
         label: "Coffee & Networking Break",
         bold: true,
         highlight: false,
@@ -197,7 +197,7 @@ function cloneDefault() {
       {
         id: uid(),
         type: "session",
-        time: "0:00am - 0:00am",
+        time: "0:00am – 0:00am",
         title: "Panel Discussion",
         speakers: [
           {
@@ -249,7 +249,7 @@ function cloneDefault() {
       {
         id: uid(),
         type: "simple",
-        time: "12:00pm - 1:00pm",
+        time: "12:00pm – 1:00pm",
         label: "Lunch & Closing",
         bold: true,
         highlight: true,
@@ -563,7 +563,7 @@ function buildFullEmailHtml(state) {
           <tr>
             <td valign="top" height="100"
                 style="border:2px solid #dddddd; padding:10px; font-size:12pt;">
-              ${escapeHtml(state.description)}
+              ${safeHtml(state.description)}
             </td>
           </tr>
         </table>
@@ -874,7 +874,7 @@ function parseHtmlToState(html) {
 
   const descTd =
     sectionBoxes["DESCRIPTION"]?.closest("table")?.querySelectorAll("td")[0];
-  if (descTd) next.description = (descTd.textContent || next.description).trim();
+  if (descTd) next.description = descTd.innerHTML.trim() || next.description;
 
   const costTd =
     sectionBoxes["COST"]?.closest("table")?.querySelectorAll("td")[0];
@@ -1462,9 +1462,11 @@ function InteractivePreview({ state, setState }) {
               <th align="left" height="35" style="background:#fff; padding-left:10px; color:#c11f2d; font-size:14pt;">DESCRIPTION</th>
             </tr>
             <tr>
-              <td valign="top" height="100" style="border:2px solid #dddddd; padding:10px; font-size:12pt; white-space:pre-wrap;" contenteditable="true" data-editable="true" data-kind="field" data-field="description">${escapeHtml(
-                state.description
-              )}</td>
+              <td valign="top" height="100" style="border:2px solid #dddddd; padding:10px; font-size:12pt;">
+                <div contenteditable="true" data-editable="true" data-kind="field" data-field="description" data-mode="html">${safeHtml(
+                  state.description
+                )}</div>
+              </td>
             </tr>
           </table>
 
@@ -1955,7 +1957,7 @@ export default function App() {
                 />
               </Field>
 
-              <Field label="Description" hint="Plain text">
+              <Field label="Description" hint="HTML allowed: <br>">
                 <TextArea
                   rows={4}
                   value={state.description}
