@@ -108,6 +108,7 @@ function cloneDefault() {
             photoW: 88,
             photoH: 110,
             tag: "",
+            bioUrl: "",
           },
         ],
       },
@@ -128,6 +129,7 @@ function cloneDefault() {
             photoW: 88,
             photoH: 110,
             tag: "",
+            bioUrl: "",
           },
         ],
       },
@@ -148,6 +150,7 @@ function cloneDefault() {
             photoW: 88,
             photoH: 110,
             tag: "",
+            bioUrl: "",
           },
         ],
       },
@@ -174,6 +177,7 @@ function cloneDefault() {
             photoW: 88,
             photoH: 110,
             tag: "",
+            bioUrl: "",
           },
         ],
       },
@@ -210,6 +214,7 @@ function cloneDefault() {
             photoW: 88,
             photoH: 110,
             tag: "Moderator",
+            bioUrl: "",
           },
           {
             id: uid(),
@@ -221,6 +226,7 @@ function cloneDefault() {
             photoW: 88,
             photoH: 110,
             tag: "",
+            bioUrl: "",
           },
           {
             id: uid(),
@@ -232,6 +238,7 @@ function cloneDefault() {
             photoW: 88,
             photoH: 110,
             tag: "",
+            bioUrl: "",
           },
         ],
       },
@@ -308,6 +315,12 @@ function buildSpeakerRow(sp) {
       )}</i></span></strong><br />`
     : "";
 
+  const bioHtml = sp.bioUrl
+    ? ` <a href="${escapeHtml(
+        sp.bioUrl
+      )}" target="_blank"><span style="color: blue;"><em>Full bio</em></span></a>`
+    : "";
+
   return `
 <tr>
   <td style="border-top:1px solid #dddddd; padding:10px; background:#f6f6f6; font-size:10pt;">
@@ -321,7 +334,7 @@ function buildSpeakerRow(sp) {
   )}" alt="" style="display:block; border:0;" />
         </td>
         <td style="padding-left:15px; font-size:10pt;">
-          ${tagHtml}<strong>${escapeHtml(sp.name || "")}</strong><br /><br />
+          ${tagHtml}<strong>${escapeHtml(sp.name || "")}</strong>${bioHtml}<br /><br />
           ${escapeHtml(sp.title || "")}<br />
           ${escapeHtml(sp.org || "")}
         </td>
@@ -649,6 +662,12 @@ function buildInteractiveSpeakerRow(blockId, sp) {
       )}</i></span></strong><br />`
     : "";
 
+  const bioHtml = sp.bioUrl
+    ? ` <a href="${escapeHtml(
+        sp.bioUrl
+      )}" target="_blank"><span style="color: blue;"><em>Full bio</em></span></a>`
+    : "";
+
   return `
 <tr>
   <td style="border-top:1px solid #dddddd; padding:10px; background:#f6f6f6; font-size:10pt;">
@@ -666,7 +685,7 @@ function buildInteractiveSpeakerRow(blockId, sp) {
             blockId
           )}" data-speaker-id="${escapeHtml(sp.id)}" data-field="name">${escapeHtml(
     sp.name || ""
-  )}</strong><br /><br />
+  )}</strong>${bioHtml}<br /><br />
           <span contenteditable="true" data-editable="true" data-kind="speaker" data-block-id="${escapeHtml(
             blockId
           )}" data-speaker-id="${escapeHtml(sp.id)}" data-field="title">${escapeHtml(
@@ -961,6 +980,11 @@ function parseHtmlToState(html) {
               ? (strongNodes[strongNodes.length - 1].textContent || "").trim()
               : "";
 
+            const bioLink =
+              row.querySelector("a[href]") ||
+              row.querySelector("td:last-child a[href]");
+            const bioUrl = (bioLink?.getAttribute("href") || "").trim();
+
             const cell =
               row.querySelector("td td:last-child") ||
               row.querySelector("td:last-child");
@@ -968,12 +992,16 @@ function parseHtmlToState(html) {
             let orgText = "";
 
             if (cell) {
-              const pieces = cell.innerHTML
+              const normalizedHtml = cell.innerHTML
                 .replace(
                   /<strong><span[^>]*>.*?<\/span><\/strong><br\s*\/?>?/i,
                   ""
                 )
-                .replace(/<strong>.*?<\/strong><br\s*\/?>?<br\s*\/?>?/i, "")
+                .replace(/<strong>.*?<\/strong>/i, "")
+                .replace(/<a\b[^>]*>.*?<\/a>/i, "")
+                .replace(/^\s*(<br\s*\/?>\s*){1,2}/i, "");
+
+              const pieces = normalizedHtml
                 .split(/<br\s*\/?>/i)
                 .map((v) => textFromHtml(v))
                 .filter(Boolean);
@@ -991,6 +1019,7 @@ function parseHtmlToState(html) {
               photoW: Number(img?.getAttribute("width") || 88),
               photoH: Number(img?.getAttribute("height") || 110),
               tag: (tagNode?.textContent || "").trim(),
+              bioUrl,
             };
           });
 
@@ -1011,6 +1040,7 @@ function parseHtmlToState(html) {
                     photoW: 88,
                     photoH: 110,
                     tag: "",
+                    bioUrl: "",
                   },
                 ],
           });
@@ -1829,6 +1859,7 @@ export default function App() {
       photoW: 88,
       photoH: 110,
       tag: "",
+      bioUrl: "",
     };
     updateBlock({ speakers: [...(selectedBlock.speakers || []), sp] });
   };
@@ -2205,6 +2236,7 @@ export default function App() {
                                   photoW: 88,
                                   photoH: 110,
                                   tag: "",
+                                  bioUrl: "",
                                 },
                               ],
                           });
@@ -2420,6 +2452,15 @@ export default function App() {
                               onChange={(e) =>
                                 updateSpeaker(sp.id, { org: e.target.value })
                               }
+                            />
+                          </Field>
+                          <Field label="Bio URL">
+                            <Input
+                              value={sp.bioUrl || ""}
+                              onChange={(e) =>
+                                updateSpeaker(sp.id, { bioUrl: e.target.value })
+                              }
+                              placeholder="https://..."
                             />
                           </Field>
                           <Field label="Photo URL">
