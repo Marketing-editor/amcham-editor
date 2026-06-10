@@ -12,7 +12,7 @@ import React, { useEffect, useMemo, useState } from "react";
  */
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const STORAGE_KEY = "amcham_full_email_editor_pretty_v10";
+const STORAGE_KEY = "amcham_full_email_editor_pretty_v11";
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -64,6 +64,7 @@ function cloneDefault() {
       "• Member Companies: KRW 00 per admission<br>• Non-Member Companies: KRW 00 per admission",
 
     showRegisterButton: false,
+    showSoldOut: false,
     registerLabel: "REGISTER",
     registerUrl: "",
 
@@ -270,10 +271,48 @@ function cloneDefault() {
 /* -------------------- Email HTML builders -------------------- */
 
 function buildRegisterButtonHtml(state) {
-  if (!state.showRegisterButton || !state.registerUrl.trim()) return "";
+  const isSoldOut = !!state.showSoldOut;
+  const shouldShowRegister = !!state.showRegisterButton && !!state.registerUrl.trim();
 
-  const label = escapeHtml(state.registerLabel || "REGISTER");
+  if (!isSoldOut && !shouldShowRegister) return "";
+
+  const label = isSoldOut ? "SOLD OUT" : escapeHtml(state.registerLabel || "REGISTER");
   const url = escapeHtml(state.registerUrl);
+  const bgColor = isSoldOut ? "#777777" : "#b90010";
+  const width = isSoldOut ? 190 : 180;
+
+  if (isSoldOut) {
+    return `
+${spacerTable(state.width, 12)}
+<table width="${escapeHtml(
+      state.width
+    )}" border="0" cellspacing="0" cellpadding="0"
+       style="border-collapse:collapse; font-family:Arial, sans-serif;">
+  <tr>
+    <td align="center" valign="middle">
+      <!--[if mso]>
+      <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml"
+        style="height:42px;v-text-anchor:middle;width:${width}px;"
+        arcsize="12%"
+        stroke="f"
+        fillcolor="${bgColor}">
+        <w:anchorlock/>
+        <center style="color:#ffffff;font-family:Arial, sans-serif;font-size:20px;font-weight:bold;">
+          ${label}
+        </center>
+      </v:roundrect>
+      <![endif]-->
+      <!--[if !mso]><!-- -->
+      <span
+         style="background:${bgColor};color:#ffffff;display:inline-block;font-family:Arial, sans-serif;font-size:20px;font-weight:bold;line-height:42px;text-align:center;text-decoration:none;width:${width}px;-webkit-text-size-adjust:none;border-radius:6px;">
+        ${label}
+      </span>
+      <!--<![endif]-->
+    </td>
+  </tr>
+</table>
+${spacerTable(state.width, 8)}`;
+  }
 
   return `
 ${spacerTable(state.width, 12)}
@@ -286,10 +325,10 @@ ${spacerTable(state.width, 12)}
       <!--[if mso]>
       <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml"
         href="${url}"
-        style="height:42px;v-text-anchor:middle;width:180px;"
+        style="height:42px;v-text-anchor:middle;width:${width}px;"
         arcsize="12%"
         stroke="f"
-        fillcolor="#b90010">
+        fillcolor="${bgColor}">
         <w:anchorlock/>
         <center style="color:#ffffff;font-family:Arial, sans-serif;font-size:20px;font-weight:bold;">
           ${label}
@@ -298,7 +337,7 @@ ${spacerTable(state.width, 12)}
       <![endif]-->
       <!--[if !mso]><!-- -->
       <a href="${url}" target="_blank"
-         style="background:#b90010;color:#ffffff;display:inline-block;font-family:Arial, sans-serif;font-size:20px;font-weight:bold;line-height:42px;text-align:center;text-decoration:none;width:180px;-webkit-text-size-adjust:none;border-radius:6px;">
+         style="background:${bgColor};color:#ffffff;display:inline-block;font-family:Arial, sans-serif;font-size:20px;font-weight:bold;line-height:42px;text-align:center;text-decoration:none;width:${width}px;-webkit-text-size-adjust:none;border-radius:6px;">
         ${label}
       </a>
       <!--<![endif]-->
@@ -845,8 +884,17 @@ function parseHtmlToState(html) {
 
   if (registerLink) {
     next.showRegisterButton = true;
+    next.showSoldOut = false;
     next.registerLabel = (registerLink.textContent || "REGISTER").trim();
     next.registerUrl = registerLink.getAttribute("href") || "";
+  }
+
+  const soldOutNode = Array.from(doc.querySelectorAll("td, span, center, div")).find(
+    (node) => (node.textContent || "").trim().toUpperCase() === "SOLD OUT"
+  );
+  if (soldOutNode && !registerLink) {
+    next.showSoldOut = true;
+    next.showRegisterButton = false;
   }
 
   const sectionBoxes = Array.from(doc.querySelectorAll("th")).reduce(
@@ -2004,27 +2052,64 @@ export default function App() {
                 />
               </Field>
 
-              <Field label="Register button">
-                <label
+              <Field label="Button display">
+                <div
                   style={{
-                    fontSize: 14,
                     display: "flex",
-                    alignItems: "center",
+                    flexDirection: "column",
                     gap: 8,
+                    fontSize: 14,
                   }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={!!state.showRegisterButton}
-                    onChange={(e) =>
-                      setField("showRegisterButton", e.target.checked)
-                    }
-                  />
-                  Show REGISTER button between Cost and Event Timetable
-                </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      type="radio"
+                      name="buttonDisplay"
+                      checked={!state.showRegisterButton && !state.showSoldOut}
+                      onChange={() =>
+                        setState((s) => ({
+                          ...s,
+                          showRegisterButton: false,
+                          showSoldOut: false,
+                        }))
+                      }
+                    />
+                    None
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      type="radio"
+                      name="buttonDisplay"
+                      checked={!!state.showRegisterButton && !state.showSoldOut}
+                      onChange={() =>
+                        setState((s) => ({
+                          ...s,
+                          showRegisterButton: true,
+                          showSoldOut: false,
+                        }))
+                      }
+                    />
+                    REGISTER button between Cost and Event Timetable
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      type="radio"
+                      name="buttonDisplay"
+                      checked={!!state.showSoldOut}
+                      onChange={() =>
+                        setState((s) => ({
+                          ...s,
+                          showRegisterButton: false,
+                          showSoldOut: true,
+                        }))
+                      }
+                    />
+                    SOLD OUT label between Cost and Event Timetable
+                  </label>
+                </div>
               </Field>
 
-              {state.showRegisterButton ? (
+              {state.showRegisterButton && !state.showSoldOut ? (
                 <>
                   <Field label="Register button label">
                     <Input
