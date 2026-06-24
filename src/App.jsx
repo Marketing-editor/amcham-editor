@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * AMCHAM Full Email + Agenda Editor
@@ -12,7 +12,7 @@ import React, { useEffect, useMemo, useState } from "react";
  */
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const STORAGE_KEY = "amcham_full_email_editor_pretty_v11";
+const STORAGE_KEY = "amcham_full_email_editor_pretty_v15";
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -1316,6 +1316,43 @@ const styles = {
     gap: 12,
     alignItems: "center",
   },
+  dragHandle: {
+    width: 28,
+    minWidth: 28,
+    height: 28,
+    borderRadius: 10,
+    border: "1px solid #cbd5e1",
+    background: "#f8fafc",
+    color: "#64748b",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 16,
+    fontWeight: 700,
+    cursor: "grab",
+    userSelect: "none",
+  },
+  floatingNav: {
+    position: "fixed",
+    right: 22,
+    bottom: 22,
+    zIndex: 9999,
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  floatingButton: {
+    width: 74,
+    padding: "10px 12px",
+    borderRadius: 999,
+    border: "1px solid #cbd5e1",
+    background: "#0f172a",
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+    boxShadow: "0 8px 22px rgba(15, 23, 42, 0.22)",
+  },
   blockTag: {
     display: "inline-block",
     padding: "3px 8px",
@@ -1411,6 +1448,14 @@ function GhostButton({ children, onClick, disabled = false, title }) {
   );
 }
 
+function FloatingNavButton({ children, onClick, title }) {
+  return (
+    <button type="button" title={title} onClick={onClick} style={styles.floatingButton}>
+      {children}
+    </button>
+  );
+}
+
 function Card({ title, children, right }) {
   return (
     <div style={styles.card}>
@@ -1443,6 +1488,31 @@ function Segmented({ value, onChange, options }) {
 /* -------------------- Interactive preview -------------------- */
 
 function InteractivePreview({ state, setState }) {
+  const iframeRef = useRef(null);
+  const previewScrollRef = useRef({ x: 0, y: 0 });
+
+  const savePreviewScroll = () => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    previewScrollRef.current = {
+      x: win.scrollX || win.pageXOffset || 0,
+      y: win.scrollY || win.pageYOffset || 0,
+    };
+  };
+
+  const restorePreviewScroll = () => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    const { x, y } = previewScrollRef.current || { x: 0, y: 0 };
+    requestAnimationFrame(() => {
+      try {
+        win.scrollTo(x, y);
+      } catch {
+        // Ignore cross-document timing issues during iframe refresh.
+      }
+    });
+  };
+
   const editableDoc = `<!DOCTYPE html>
 <html>
 <head>
@@ -1690,6 +1760,7 @@ function InteractivePreview({ state, setState }) {
       if (!data) return;
 
       if (data.type === "amcham-inline-edit" && data.field) {
+        savePreviewScroll();
         setState((s) => ({ ...s, [data.field]: data.value }));
         return;
       }
@@ -1699,6 +1770,7 @@ function InteractivePreview({ state, setState }) {
         data.blockId &&
         data.field
       ) {
+        savePreviewScroll();
         setState((s) => ({
           ...s,
           blocks: (s.blocks || []).map((b) =>
@@ -1714,6 +1786,7 @@ function InteractivePreview({ state, setState }) {
         data.speakerId &&
         data.field
       ) {
+        savePreviewScroll();
         setState((s) => ({
           ...s,
           blocks: (s.blocks || []).map((b) =>
@@ -1736,6 +1809,10 @@ function InteractivePreview({ state, setState }) {
     return () => window.removeEventListener("message", onMessage);
   }, [setState]);
 
+  useEffect(() => {
+    return () => savePreviewScroll();
+  }, [editableDoc]);
+
   return (
     <div>
       <div style={styles.notice}>
@@ -1744,6 +1821,7 @@ function InteractivePreview({ state, setState }) {
       </div>
       <div style={styles.previewWrap}>
         <iframe
+          ref={iframeRef}
           title="interactive-preview"
           style={{
             width: "100%",
@@ -1755,6 +1833,7 @@ function InteractivePreview({ state, setState }) {
           }}
           sandbox="allow-scripts"
           srcDoc={editableDoc}
+          onLoad={restorePreviewScroll}
         />
       </div>
     </div>
@@ -1863,6 +1942,7 @@ export default function App() {
                 photoW: 88,
                 photoH: 110,
                 tag: "",
+                bioUrl: "",
               },
             ],
           };
@@ -1884,6 +1964,14 @@ export default function App() {
       [arr[i], arr[j]] = [arr[j], arr[i]];
       return { ...s, blocks: arr };
     });
+  };
+
+  const scrollToPageTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const scrollToPageBottom = () => {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
   };
 
   const updateBlock = (patch) => {
@@ -1965,6 +2053,10 @@ export default function App() {
 
   return (
     <div style={styles.page}>
+      <div style={styles.floatingNav}>
+        <FloatingNavButton title="Go to top" onClick={scrollToPageTop}>Top</FloatingNavButton>
+        <FloatingNavButton title="Go to bottom" onClick={scrollToPageBottom}>Bottom</FloatingNavButton>
+      </div>
       <div style={styles.shell}>
         <div style={styles.topBar}>
           <div>
@@ -2171,6 +2263,9 @@ export default function App() {
                 </div>
               }
             >
+              <div style={{ ...styles.smallText, marginBottom: 12 }}>
+                Use the ↑/↓ buttons to rearrange long programs. Floating Top / Bottom buttons help you move around quickly.
+              </div>
               {state.blocks.map((b, idx) => {
                 const typeLabel =
                   b.type === "header"
