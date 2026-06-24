@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * AMCHAM Full Email + Agenda Editor
@@ -12,7 +12,7 @@ import React, { useEffect, useMemo, useState } from "react";
  */
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const STORAGE_KEY = "amcham_full_email_editor_pretty_v11";
+const STORAGE_KEY = "amcham_full_email_editor_pretty_v19";
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -1335,6 +1335,26 @@ const styles = {
   previewWrap: {
     overflowX: "auto",
   },
+  floatingNav: {
+    position: "fixed",
+    right: 22,
+    bottom: 22,
+    zIndex: 9999,
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  floatingButton: {
+    padding: "9px 12px",
+    borderRadius: 999,
+    border: "1px solid #cbd5e1",
+    background: "#fff",
+    color: "#0f172a",
+    fontSize: 12,
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 8px 18px rgba(15, 23, 42, 0.18)",
+  },
   smallText: {
     fontSize: 12,
     color: "#64748b",
@@ -1443,6 +1463,31 @@ function Segmented({ value, onChange, options }) {
 /* -------------------- Interactive preview -------------------- */
 
 function InteractivePreview({ state, setState }) {
+  const iframeRef = useRef(null);
+  const previewScrollRef = useRef({ x: 0, y: 0 });
+
+  const savePreviewScroll = () => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    previewScrollRef.current = {
+      x: win.scrollX || win.pageXOffset || 0,
+      y: win.scrollY || win.pageYOffset || 0,
+    };
+  };
+
+  const restorePreviewScroll = () => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    const { x, y } = previewScrollRef.current || { x: 0, y: 0 };
+    requestAnimationFrame(() => {
+      try {
+        win.scrollTo(x, y);
+      } catch {
+        // Ignore iframe timing issues during refresh.
+      }
+    });
+  };
+
   const editableDoc = `<!DOCTYPE html>
 <html>
 <head>
@@ -1690,6 +1735,7 @@ function InteractivePreview({ state, setState }) {
       if (!data) return;
 
       if (data.type === "amcham-inline-edit" && data.field) {
+        savePreviewScroll();
         setState((s) => ({ ...s, [data.field]: data.value }));
         return;
       }
@@ -1699,6 +1745,7 @@ function InteractivePreview({ state, setState }) {
         data.blockId &&
         data.field
       ) {
+        savePreviewScroll();
         setState((s) => ({
           ...s,
           blocks: (s.blocks || []).map((b) =>
@@ -1714,6 +1761,7 @@ function InteractivePreview({ state, setState }) {
         data.speakerId &&
         data.field
       ) {
+        savePreviewScroll();
         setState((s) => ({
           ...s,
           blocks: (s.blocks || []).map((b) =>
@@ -1744,6 +1792,7 @@ function InteractivePreview({ state, setState }) {
       </div>
       <div style={styles.previewWrap}>
         <iframe
+          ref={iframeRef}
           title="interactive-preview"
           style={{
             width: "100%",
@@ -1755,6 +1804,7 @@ function InteractivePreview({ state, setState }) {
           }}
           sandbox="allow-scripts"
           srcDoc={editableDoc}
+          onLoad={restorePreviewScroll}
         />
       </div>
     </div>
@@ -1767,30 +1817,43 @@ export default function App() {
   const [state, setState] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : cloneDefault();
+      return saved ? normalizeState(JSON.parse(saved)) : cloneDefault();
     } catch {
       return cloneDefault();
     }
   });
+  const blocks = Array.isArray(state.blocks) ? state.blocks : [];
   const [selectedBlockId, setSelectedBlockId] = useState(
-    state.blocks[0]?.id || null
+    blocks[0]?.id || null
   );
   const [previewMode, setPreviewMode] = useState("interactive");
   const [importHtmlText, setImportHtmlText] = useState("");
+  const importFileInputRef = useRef(null);
   const [statusMessage, setStatusMessage] = useState("");
 
+  const scrollToPageTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const scrollToPageBottom = () => {
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: "smooth",
+    });
+  };
+
   useEffect(() => {
-    if (!state.blocks.some((b) => b.id === selectedBlockId)) {
-      setSelectedBlockId(state.blocks[0]?.id || null);
+    if (!blocks.some((b) => b.id === selectedBlockId)) {
+      setSelectedBlockId(blocks[0]?.id || null);
     }
-  }, [state.blocks, selectedBlockId]);
+  }, [blocks, selectedBlockId]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
   const selectedBlock =
-    state.blocks.find((b) => b.id === selectedBlockId) || null;
+    blocks.find((b) => b.id === selectedBlockId) || null;
 
   const timetableHtml = useMemo(() => buildTimetableHtml(state).trim(), [state]);
   const fullEmailHtml = useMemo(() => buildFullEmailHtml(state).trim(), [state]);
@@ -1863,6 +1926,7 @@ export default function App() {
                 photoW: 88,
                 photoH: 110,
                 tag: "",
+                bioUrl: "",
               },
             ],
           };
@@ -1945,8 +2009,9 @@ export default function App() {
         return;
       }
       const result = parseHtmlToState(importHtmlText);
-      setState(result.state);
-      setSelectedBlockId(result.state.blocks[0]?.id || null);
+      const nextState = normalizeState(result.state);
+      setState(nextState);
+      setSelectedBlockId(nextState.blocks[0]?.id || null);
       setStatusMessage(
         result.warnings.length
           ? `Imported with notes: ${result.warnings.join(" ")}`
@@ -1956,7 +2021,62 @@ export default function App() {
       alert(`Import failed: ${err.message}`);
     }
   };
+  const uploadHtmlFile = (e) => {
+    const file = e.target.files?.[0];
 
+    if (!file) return;
+
+    const fileName = file.name || "";
+    const isAllowed =
+      fileName.toLowerCase().endsWith(".html") ||
+      fileName.toLowerCase().endsWith(".htm") ||
+      fileName.toLowerCase().endsWith(".txt") ||
+      file.type === "text/html" ||
+      file.type === "text/plain";
+
+    if (!isAllowed) {
+      alert("Please upload an HTML, HTM, or TXT file.");
+      e.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      try {
+        const html = String(reader.result || "");
+
+        if (!html.trim()) {
+          alert("The selected file is empty.");
+          return;
+        }
+
+        setImportHtmlText(html);
+
+        const result = parseHtmlToState(html);
+        const nextState = normalizeState(result.state);
+
+        setState(nextState);
+        setSelectedBlockId(nextState.blocks[0]?.id || null);
+        setStatusMessage(
+          result.warnings.length
+            ? `Imported from file with notes: ${result.warnings.join(" ")}`
+            : `Imported from file: ${file.name}`
+        );
+      } catch (err) {
+        alert(`Import failed: ${err.message}`);
+      } finally {
+        e.target.value = "";
+      }
+    };
+
+    reader.onerror = () => {
+      alert("Could not read the selected file.");
+      e.target.value = "";
+    };
+
+    reader.readAsText(file, "UTF-8");
+  };
   const gridTwo = {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
@@ -2171,7 +2291,7 @@ export default function App() {
                 </div>
               }
             >
-              {state.blocks.map((b, idx) => {
+              {blocks.map((b, idx) => {
                 const typeLabel =
                   b.type === "header"
                     ? "Header"
@@ -2252,7 +2372,7 @@ export default function App() {
                         ↑
                       </GhostButton>
                       <GhostButton
-                        disabled={idx === state.blocks.length - 1}
+                        disabled={idx === blocks.length - 1}
                         onClick={() => moveBlock(b.id, "down")}
                       >
                         ↓
@@ -2610,6 +2730,13 @@ export default function App() {
                   onChange={(e) => setImportHtmlText(e.target.value)}
                 />
               </Field>
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept=".html,.htm,.txt,text/html,text/plain"
+                style={{ display: "none" }}
+                onChange={uploadHtmlFile}
+              />
               <div
                 style={{
                   display: "flex",
@@ -2619,6 +2746,9 @@ export default function App() {
                 }}
               >
                 <Button onClick={importHtml}>Import HTML</Button>
+                <GhostButton onClick={() => importFileInputRef.current?.click()}>
+                  Upload HTML File
+                </GhostButton>
                 <GhostButton onClick={() => setImportHtmlText("")}>
                   Clear
                 </GhostButton>
@@ -2668,6 +2798,53 @@ export default function App() {
           </div>
         </div>
       </div>
+      <div style={styles.floatingNav}>
+        <button type="button" style={styles.floatingButton} onClick={scrollToPageTop}>
+          Top
+        </button>
+        <button type="button" style={styles.floatingButton} onClick={scrollToPageBottom}>
+          Bottom
+        </button>
+      </div>
     </div>
   );
+
+function normalizeState(value) {
+  const base = cloneDefault();
+  if (!value || typeof value !== "object") return base;
+
+  const next = { ...base, ...value };
+  next.blocks = Array.isArray(value.blocks) && value.blocks.length ? value.blocks : base.blocks;
+
+  next.blocks = next.blocks
+    .filter((block) => block && typeof block === "object")
+    .map((block) => {
+      const type = ["header", "simple", "session"].includes(block.type)
+        ? block.type
+        : "simple";
+      const normalized = { ...block, id: block.id || uid(), type };
+
+      if (type === "session") {
+        normalized.speakers = Array.isArray(block.speakers)
+          ? block.speakers.map((sp) => ({
+              id: sp?.id || uid(),
+              name: sp?.name || "TBD",
+              title: sp?.title || "",
+              org: sp?.org || "",
+              photoUrl: sp?.photoUrl || "",
+              photoW: Number(sp?.photoW || 88),
+              photoH: Number(sp?.photoH || 110),
+              tag: sp?.tag || "",
+              bioUrl: sp?.bioUrl || "",
+              moderator: Boolean(sp?.moderator),
+            }))
+          : [];
+      }
+
+      return normalized;
+    });
+
+  if (!next.blocks.length) next.blocks = base.blocks;
+  return next;
+}
 }
