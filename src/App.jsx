@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 /**
  * AMCHAM Full Email + Agenda Editor
@@ -12,7 +12,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
  */
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const STORAGE_KEY = "amcham_full_email_editor_pretty_v16";
+const STORAGE_KEY = "amcham_full_email_editor_pretty_v11";
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -1316,27 +1316,6 @@ const styles = {
     gap: 12,
     alignItems: "center",
   },
-  floatingNav: {
-    position: "fixed",
-    right: 22,
-    bottom: 22,
-    zIndex: 9999,
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-  },
-  floatingButton: {
-    width: 74,
-    padding: "10px 12px",
-    borderRadius: 999,
-    border: "1px solid #cbd5e1",
-    background: "#0f172a",
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: 700,
-    cursor: "pointer",
-    boxShadow: "0 8px 22px rgba(15, 23, 42, 0.22)",
-  },
   blockTag: {
     display: "inline-block",
     padding: "3px 8px",
@@ -1461,42 +1440,9 @@ function Segmented({ value, onChange, options }) {
   );
 }
 
-function FloatingNavButton({ children, onClick, title }) {
-  return (
-    <button type="button" title={title} onClick={onClick} style={styles.floatingButton}>
-      {children}
-    </button>
-  );
-}
-
 /* -------------------- Interactive preview -------------------- */
 
 function InteractivePreview({ state, setState }) {
-  const iframeRef = useRef(null);
-  const previewScrollRef = useRef({ x: 0, y: 0 });
-
-  const savePreviewScroll = () => {
-    const win = iframeRef.current?.contentWindow;
-    if (!win) return;
-    previewScrollRef.current = {
-      x: win.scrollX || win.pageXOffset || 0,
-      y: win.scrollY || win.pageYOffset || 0,
-    };
-  };
-
-  const restorePreviewScroll = () => {
-    const win = iframeRef.current?.contentWindow;
-    if (!win) return;
-    const { x, y } = previewScrollRef.current || { x: 0, y: 0 };
-    requestAnimationFrame(() => {
-      try {
-        win.scrollTo(x, y);
-      } catch {
-        // Ignore iframe timing issues during refresh.
-      }
-    });
-  };
-
   const editableDoc = `<!DOCTYPE html>
 <html>
 <head>
@@ -1744,7 +1690,6 @@ function InteractivePreview({ state, setState }) {
       if (!data) return;
 
       if (data.type === "amcham-inline-edit" && data.field) {
-        savePreviewScroll();
         setState((s) => ({ ...s, [data.field]: data.value }));
         return;
       }
@@ -1754,7 +1699,6 @@ function InteractivePreview({ state, setState }) {
         data.blockId &&
         data.field
       ) {
-        savePreviewScroll();
         setState((s) => ({
           ...s,
           blocks: (s.blocks || []).map((b) =>
@@ -1770,7 +1714,6 @@ function InteractivePreview({ state, setState }) {
         data.speakerId &&
         data.field
       ) {
-        savePreviewScroll();
         setState((s) => ({
           ...s,
           blocks: (s.blocks || []).map((b) =>
@@ -1793,10 +1736,6 @@ function InteractivePreview({ state, setState }) {
     return () => window.removeEventListener("message", onMessage);
   }, [setState]);
 
-  useEffect(() => {
-    return () => savePreviewScroll();
-  }, [editableDoc]);
-
   return (
     <div>
       <div style={styles.notice}>
@@ -1805,7 +1744,6 @@ function InteractivePreview({ state, setState }) {
       </div>
       <div style={styles.previewWrap}>
         <iframe
-          ref={iframeRef}
           title="interactive-preview"
           style={{
             width: "100%",
@@ -1817,7 +1755,6 @@ function InteractivePreview({ state, setState }) {
           }}
           sandbox="allow-scripts"
           srcDoc={editableDoc}
-          onLoad={restorePreviewScroll}
         />
       </div>
     </div>
@@ -1840,16 +1777,7 @@ export default function App() {
   );
   const [previewMode, setPreviewMode] = useState("interactive");
   const [importHtmlText, setImportHtmlText] = useState("");
-  const importFileInputRef = useRef(null);
   const [statusMessage, setStatusMessage] = useState("");
-
-  const scrollToPageTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const scrollToPageBottom = () => {
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
-  };
 
   useEffect(() => {
     if (!state.blocks.some((b) => b.id === selectedBlockId)) {
@@ -2010,46 +1938,22 @@ export default function App() {
     });
   };
 
-  const applyImportedHtml = (html, sourceLabel = "HTML") => {
+  const importHtml = () => {
     try {
-      if (!html.trim()) {
-        alert("Paste or upload HTML first.");
+      if (!importHtmlText.trim()) {
+        alert("Paste HTML first.");
         return;
       }
-      const result = parseHtmlToState(html);
-      setImportHtmlText(html);
+      const result = parseHtmlToState(importHtmlText);
       setState(result.state);
       setSelectedBlockId(result.state.blocks[0]?.id || null);
       setStatusMessage(
         result.warnings.length
-          ? `Imported ${sourceLabel} with notes: ${result.warnings.join(" ")}`
-          : `${sourceLabel} imported successfully.`
+          ? `Imported with notes: ${result.warnings.join(" ")}`
+          : "HTML imported successfully."
       );
     } catch (err) {
       alert(`Import failed: ${err.message}`);
-    }
-  };
-
-  const importHtml = () => {
-    applyImportedHtml(importHtmlText, "HTML");
-  };
-
-  const uploadHtmlFile = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    const allowed = /\.(html?|txt)$/i.test(file.name);
-    if (!allowed) {
-      alert("Please upload an .html, .htm, or .txt file.");
-      return;
-    }
-
-    try {
-      const text = await file.text();
-      applyImportedHtml(text, file.name);
-    } catch {
-      alert("Could not read the selected file.");
     }
   };
 
@@ -2061,10 +1965,6 @@ export default function App() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.floatingNav}>
-        <FloatingNavButton title="Go to top" onClick={scrollToPageTop}>Top</FloatingNavButton>
-        <FloatingNavButton title="Go to bottom" onClick={scrollToPageBottom}>Bottom</FloatingNavButton>
-      </div>
       <div style={styles.shell}>
         <div style={styles.topBar}>
           <div>
@@ -2710,13 +2610,6 @@ export default function App() {
                   onChange={(e) => setImportHtmlText(e.target.value)}
                 />
               </Field>
-              <input
-                ref={importFileInputRef}
-                type="file"
-                accept=".html,.htm,.txt,text/html,text/plain"
-                onChange={uploadHtmlFile}
-                style={{ display: "none" }}
-              />
               <div
                 style={{
                   display: "flex",
@@ -2725,9 +2618,6 @@ export default function App() {
                   marginBottom: 14,
                 }}
               >
-                <Button onClick={() => importFileInputRef.current?.click()}>
-                  Upload HTML File
-                </Button>
                 <Button onClick={importHtml}>Import HTML</Button>
                 <GhostButton onClick={() => setImportHtmlText("")}>
                   Clear
