@@ -1467,23 +1467,32 @@ function InteractivePreview({ state, setState }) {
   const previewScrollRef = useRef({ x: 0, y: 0 });
 
   const savePreviewScroll = () => {
-    const win = iframeRef.current?.contentWindow;
-    if (!win) return;
-    previewScrollRef.current = {
-      x: win.scrollX || win.pageXOffset || 0,
-      y: win.scrollY || win.pageYOffset || 0,
-    };
+    let x = 0;
+    let y = 0;
+
+    try {
+      const win = iframeRef.current?.contentWindow;
+      if (!win) return;
+      x = win.scrollX || win.pageXOffset || 0;
+      y = win.scrollY || win.pageYOffset || 0;
+    } catch {
+      x = 0;
+      y = 0;
+    }
+
+    previewScrollRef.current = { x, y };
   };
 
   const restorePreviewScroll = () => {
-    const win = iframeRef.current?.contentWindow;
-    if (!win) return;
     const { x, y } = previewScrollRef.current || { x: 0, y: 0 };
+
     requestAnimationFrame(() => {
       try {
-        win.scrollTo(x, y);
+        const win = iframeRef.current?.contentWindow;
+        if (!win) return;
+        win.scrollTo(x || 0, y || 0);
       } catch {
-        // Ignore iframe timing issues during refresh.
+        // Ignore iframe timing/cross-origin access issues during refresh.
       }
     });
   };
