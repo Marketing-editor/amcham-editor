@@ -12,7 +12,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
  */
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const STORAGE_KEY = "amcham_full_email_editor_pretty_v19";
+const STORAGE_KEY = "amcham_full_email_editor_pretty_v21";
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -1467,32 +1467,28 @@ function InteractivePreview({ state, setState }) {
   const previewScrollRef = useRef({ x: 0, y: 0 });
 
   const savePreviewScroll = () => {
-    let x = 0;
-    let y = 0;
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
 
     try {
-      const win = iframeRef.current?.contentWindow;
-      if (!win) return;
-      x = win.scrollX || win.pageXOffset || 0;
-      y = win.scrollY || win.pageYOffset || 0;
+      previewScrollRef.current = {
+        x: win.scrollX || win.pageXOffset || 0,
+        y: win.scrollY || win.pageYOffset || 0,
+      };
     } catch {
-      x = 0;
-      y = 0;
+      previewScrollRef.current = previewScrollRef.current || { x: 0, y: 0 };
     }
-
-    previewScrollRef.current = { x, y };
   };
 
   const restorePreviewScroll = () => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
     const { x, y } = previewScrollRef.current || { x: 0, y: 0 };
-
     requestAnimationFrame(() => {
       try {
-        const win = iframeRef.current?.contentWindow;
-        if (!win) return;
-        win.scrollTo(x || 0, y || 0);
+        win.scrollTo(x, y);
       } catch {
-        // Ignore iframe timing/cross-origin access issues during refresh.
+        // Ignore iframe timing issues during refresh.
       }
     });
   };
@@ -1738,6 +1734,19 @@ function InteractivePreview({ state, setState }) {
 </body>
 </html>`;
 
+  const [iframeDoc, setIframeDoc] = useState(editableDoc);
+  const skipNextPreviewDocUpdateRef = useRef(false);
+
+  useEffect(() => {
+    if (skipNextPreviewDocUpdateRef.current) {
+      skipNextPreviewDocUpdateRef.current = false;
+      return;
+    }
+
+    savePreviewScroll();
+    setIframeDoc(editableDoc);
+  }, [editableDoc]);
+
   useEffect(() => {
     const onMessage = (event) => {
       const data = event?.data;
@@ -1745,6 +1754,7 @@ function InteractivePreview({ state, setState }) {
 
       if (data.type === "amcham-inline-edit" && data.field) {
         savePreviewScroll();
+        skipNextPreviewDocUpdateRef.current = true;
         setState((s) => ({ ...s, [data.field]: data.value }));
         return;
       }
@@ -1755,6 +1765,7 @@ function InteractivePreview({ state, setState }) {
         data.field
       ) {
         savePreviewScroll();
+        skipNextPreviewDocUpdateRef.current = true;
         setState((s) => ({
           ...s,
           blocks: (s.blocks || []).map((b) =>
@@ -1771,6 +1782,7 @@ function InteractivePreview({ state, setState }) {
         data.field
       ) {
         savePreviewScroll();
+        skipNextPreviewDocUpdateRef.current = true;
         setState((s) => ({
           ...s,
           blocks: (s.blocks || []).map((b) =>
@@ -1812,7 +1824,7 @@ function InteractivePreview({ state, setState }) {
             background: "#fff",
           }}
           sandbox="allow-scripts"
-          srcDoc={editableDoc}
+          srcDoc={iframeDoc}
           onLoad={restorePreviewScroll}
         />
       </div>
