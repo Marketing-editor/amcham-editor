@@ -12,7 +12,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
  */
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const STORAGE_KEY = "amcham_full_email_editor_pretty_v15";
+const STORAGE_KEY = "amcham_full_email_editor_pretty_v16";
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -1316,22 +1316,6 @@ const styles = {
     gap: 12,
     alignItems: "center",
   },
-  dragHandle: {
-    width: 28,
-    minWidth: 28,
-    height: 28,
-    borderRadius: 10,
-    border: "1px solid #cbd5e1",
-    background: "#f8fafc",
-    color: "#64748b",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 16,
-    fontWeight: 700,
-    cursor: "grab",
-    userSelect: "none",
-  },
   floatingNav: {
     position: "fixed",
     right: 22,
@@ -1448,14 +1432,6 @@ function GhostButton({ children, onClick, disabled = false, title }) {
   );
 }
 
-function FloatingNavButton({ children, onClick, title }) {
-  return (
-    <button type="button" title={title} onClick={onClick} style={styles.floatingButton}>
-      {children}
-    </button>
-  );
-}
-
 function Card({ title, children, right }) {
   return (
     <div style={styles.card}>
@@ -1485,6 +1461,14 @@ function Segmented({ value, onChange, options }) {
   );
 }
 
+function FloatingNavButton({ children, onClick, title }) {
+  return (
+    <button type="button" title={title} onClick={onClick} style={styles.floatingButton}>
+      {children}
+    </button>
+  );
+}
+
 /* -------------------- Interactive preview -------------------- */
 
 function InteractivePreview({ state, setState }) {
@@ -1508,7 +1492,7 @@ function InteractivePreview({ state, setState }) {
       try {
         win.scrollTo(x, y);
       } catch {
-        // Ignore cross-document timing issues during iframe refresh.
+        // Ignore iframe timing issues during refresh.
       }
     });
   };
@@ -1856,7 +1840,16 @@ export default function App() {
   );
   const [previewMode, setPreviewMode] = useState("interactive");
   const [importHtmlText, setImportHtmlText] = useState("");
+  const importFileInputRef = useRef(null);
   const [statusMessage, setStatusMessage] = useState("");
+
+  const scrollToPageTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const scrollToPageBottom = () => {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+  };
 
   useEffect(() => {
     if (!state.blocks.some((b) => b.id === selectedBlockId)) {
@@ -1942,7 +1935,6 @@ export default function App() {
                 photoW: 88,
                 photoH: 110,
                 tag: "",
-                bioUrl: "",
               },
             ],
           };
@@ -1964,14 +1956,6 @@ export default function App() {
       [arr[i], arr[j]] = [arr[j], arr[i]];
       return { ...s, blocks: arr };
     });
-  };
-
-  const scrollToPageTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const scrollToPageBottom = () => {
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
   };
 
   const updateBlock = (patch) => {
@@ -2026,22 +2010,46 @@ export default function App() {
     });
   };
 
-  const importHtml = () => {
+  const applyImportedHtml = (html, sourceLabel = "HTML") => {
     try {
-      if (!importHtmlText.trim()) {
-        alert("Paste HTML first.");
+      if (!html.trim()) {
+        alert("Paste or upload HTML first.");
         return;
       }
-      const result = parseHtmlToState(importHtmlText);
+      const result = parseHtmlToState(html);
+      setImportHtmlText(html);
       setState(result.state);
       setSelectedBlockId(result.state.blocks[0]?.id || null);
       setStatusMessage(
         result.warnings.length
-          ? `Imported with notes: ${result.warnings.join(" ")}`
-          : "HTML imported successfully."
+          ? `Imported ${sourceLabel} with notes: ${result.warnings.join(" ")}`
+          : `${sourceLabel} imported successfully.`
       );
     } catch (err) {
       alert(`Import failed: ${err.message}`);
+    }
+  };
+
+  const importHtml = () => {
+    applyImportedHtml(importHtmlText, "HTML");
+  };
+
+  const uploadHtmlFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const allowed = /\.(html?|txt)$/i.test(file.name);
+    if (!allowed) {
+      alert("Please upload an .html, .htm, or .txt file.");
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      applyImportedHtml(text, file.name);
+    } catch {
+      alert("Could not read the selected file.");
     }
   };
 
@@ -2263,9 +2271,6 @@ export default function App() {
                 </div>
               }
             >
-              <div style={{ ...styles.smallText, marginBottom: 12 }}>
-                Use the ↑/↓ buttons to rearrange long programs. Floating Top / Bottom buttons help you move around quickly.
-              </div>
               {state.blocks.map((b, idx) => {
                 const typeLabel =
                   b.type === "header"
@@ -2705,6 +2710,13 @@ export default function App() {
                   onChange={(e) => setImportHtmlText(e.target.value)}
                 />
               </Field>
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept=".html,.htm,.txt,text/html,text/plain"
+                onChange={uploadHtmlFile}
+                style={{ display: "none" }}
+              />
               <div
                 style={{
                   display: "flex",
@@ -2713,6 +2725,9 @@ export default function App() {
                   marginBottom: 14,
                 }}
               >
+                <Button onClick={() => importFileInputRef.current?.click()}>
+                  Upload HTML File
+                </Button>
                 <Button onClick={importHtml}>Import HTML</Button>
                 <GhostButton onClick={() => setImportHtmlText("")}>
                   Clear
