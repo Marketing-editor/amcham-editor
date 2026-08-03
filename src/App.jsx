@@ -12,7 +12,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
  */
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const STORAGE_KEY = "amcham_full_email_editor_pretty_v21";
+const STORAGE_KEY = "amcham_full_email_editor_pretty_v22";
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -25,6 +25,13 @@ function escapeHtml(s) {
 
 function safeHtml(s) {
   return (s ?? "").toString().trim();
+}
+
+function normalizeTimeDash(value) {
+  return String(value ?? "")
+    .replace(/\s*[–—-]\s*/g, " – ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function textFromHtml(html) {
@@ -56,7 +63,7 @@ function cloneDefault() {
     bannerUrl: "웹배너 링크 넣기",
 
     dateLine: "Day, Month date, 2026",
-    timeLine: "0:00 am - 0:00 pm",
+    timeLine: "0:00 am – 0:00 pm",
     venue: "TBD",
     topicHtml: "TBD",
     description: "TBD",
@@ -272,47 +279,25 @@ function cloneDefault() {
 
 function buildRegisterButtonHtml(state) {
   const isSoldOut = !!state.showSoldOut;
-  const shouldShowRegister = !!state.showRegisterButton && !!state.registerUrl.trim();
+  const shouldShowRegister =
+    !!state.showRegisterButton && !!String(state.registerUrl || "").trim();
 
   if (!isSoldOut && !shouldShowRegister) return "";
 
-  const label = isSoldOut ? "SOLD OUT" : escapeHtml(state.registerLabel || "REGISTER");
-  const url = escapeHtml(state.registerUrl);
+  const label = isSoldOut
+    ? "SOLD OUT"
+    : escapeHtml(state.registerLabel || "REGISTER");
+  const url = escapeHtml(state.registerUrl || "");
   const bgColor = isSoldOut ? "#777777" : "#b90010";
-  const width = isSoldOut ? 190 : 180;
 
-  if (isSoldOut) {
-    return `
-${spacerTable(state.width, 12)}
-<table width="${escapeHtml(
-      state.width
-    )}" border="0" cellspacing="0" cellpadding="0"
-       style="border-collapse:collapse; font-family:Arial, sans-serif;">
-  <tr>
-    <td align="center" valign="middle">
-      <!--[if mso]>
-      <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml"
-        style="height:42px;v-text-anchor:middle;width:${width}px;"
-        arcsize="12%"
-        stroke="f"
-        fillcolor="${bgColor}">
-        <w:anchorlock/>
-        <center style="color:#ffffff;font-family:Arial, sans-serif;font-size:20px;font-weight:bold;">
-          ${label}
-        </center>
-      </v:roundrect>
-      <![endif]-->
-      <!--[if !mso]><!-- -->
-      <span
-         style="background:${bgColor};color:#ffffff;display:inline-block;font-family:Arial, sans-serif;font-size:20px;font-weight:bold;line-height:42px;text-align:center;text-decoration:none;width:${width}px;-webkit-text-size-adjust:none;border-radius:6px;">
-        ${label}
-      </span>
-      <!--<![endif]-->
-    </td>
-  </tr>
-</table>
-${spacerTable(state.width, 8)}`;
-  }
+  // Extra horizontal room prevents Outlook's Word rendering engine from
+  // clipping the last character at Windows display scaling levels.
+  const buttonWidth = 220;
+  const buttonHeight = 44;
+  const buttonFontSize = 18;
+  const hrefAttribute = isSoldOut ? "" : ` href="${url}"`;
+  const nonMsoTag = isSoldOut ? "span" : "a";
+  const nonMsoHref = isSoldOut ? "" : ` href="${url}" target="_blank"`;
 
   return `
 ${spacerTable(state.width, 12)}
@@ -321,25 +306,25 @@ ${spacerTable(state.width, 12)}
   )}" border="0" cellspacing="0" cellpadding="0"
        style="border-collapse:collapse; font-family:Arial, sans-serif;">
   <tr>
-    <td align="center" valign="middle">
+    <td align="center" valign="middle" style="padding:0;">
       <!--[if mso]>
       <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml"
-        href="${url}"
-        style="height:42px;v-text-anchor:middle;width:${width}px;"
+        xmlns:w="urn:schemas-microsoft-com:office:word"${hrefAttribute}
+        style="height:${buttonHeight}px;v-text-anchor:middle;width:${buttonWidth}px;"
         arcsize="12%"
         stroke="f"
         fillcolor="${bgColor}">
         <w:anchorlock/>
-        <center style="color:#ffffff;font-family:Arial, sans-serif;font-size:20px;font-weight:bold;">
+        <center style="color:#ffffff;font-family:Arial, sans-serif;font-size:${buttonFontSize}px;font-weight:bold;line-height:${buttonHeight}px;mso-line-height-rule:exactly;white-space:nowrap;">
           ${label}
         </center>
       </v:roundrect>
       <![endif]-->
       <!--[if !mso]><!-- -->
-      <a href="${url}" target="_blank"
-         style="background:${bgColor};color:#ffffff;display:inline-block;font-family:Arial, sans-serif;font-size:20px;font-weight:bold;line-height:42px;text-align:center;text-decoration:none;width:${width}px;-webkit-text-size-adjust:none;border-radius:6px;">
+      <${nonMsoTag}${nonMsoHref}
+         style="background:${bgColor};color:#ffffff;display:inline-block;font-family:Arial, sans-serif;font-size:${buttonFontSize}px;font-weight:bold;line-height:${buttonHeight}px;text-align:center;text-decoration:none;width:${buttonWidth}px;white-space:nowrap;-webkit-text-size-adjust:none;border-radius:6px;">
         ${label}
-      </a>
+      </${nonMsoTag}>
       <!--<![endif]-->
     </td>
   </tr>
@@ -389,7 +374,7 @@ function buildSessionBlockHtml(time, title, speakers) {
 <tr style="font-size:11pt;">
   <td width="20%" align="center" valign="middle"
       style="background:#fff; border-top:1px solid #dddddd; border-right:1px solid #dddddd; padding:5px;">
-    <strong>${escapeHtml(time || "")}</strong>
+    <strong>${escapeHtml(normalizeTimeDash(time || ""))}</strong>
   </td>
   <td colspan="3" style="border-top:1px solid #dddddd; padding:0;">
     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; font-family: Arial;">
@@ -448,7 +433,7 @@ function buildSimpleBlockHtml({ time, label, bold, highlight, centerLabel }) {
   return `
 <tr style="font-size:11pt;">
   <td width="20%" align="center" valign="middle" style="${leftStyle}">
-    <strong style="font-size:11pt;">${escapeHtml(time || "")}</strong>
+    <strong style="font-size:11pt;">${escapeHtml(normalizeTimeDash(time || ""))}</strong>
   </td>
   <td colspan="3" align="left" valign="middle" style="${rightStyle}">
     ${labelHtml}
@@ -460,7 +445,7 @@ function buildTimetableHtml(state) {
   const blocksHtml = (state.blocks || [])
     .map((b) => {
       if (b.type === "header") return buildHeaderBlockHtml(b.title);
-      if (b.type === "simple") return buildInteractiveSimpleBlockHtml(b);
+      if (b.type === "simple") return buildSimpleBlockHtml(b);
       if (b.type === "session")
         return buildSessionBlockHtml(b.time, b.title, b.speakers);
       return "";
@@ -562,7 +547,7 @@ function buildFullEmailHtml(state) {
                   <td valign="top" height="100"
                       style="border:2px solid #dddddd; padding:10px; line-height:1.4; font-size:12pt;">
                     <strong>${escapeHtml(state.dateLine)}</strong><br />
-                    ${escapeHtml(state.timeLine)}
+                    ${escapeHtml(normalizeTimeDash(state.timeLine))}
                   </td>
                 </tr>
               </table>
@@ -753,7 +738,7 @@ function buildInteractiveSessionBlockHtml(block) {
       style="background:#fff; border-top:1px solid #dddddd; border-right:1px solid #dddddd; padding:5px;">
     <strong contenteditable="true" data-editable="true" data-kind="block" data-block-id="${escapeHtml(
             block.id
-          )}" data-field="time">${escapeHtml(block.time || "")}</strong>
+          )}" data-field="time">${escapeHtml(normalizeTimeDash(block.time || ""))}</strong>
   </td>
   <td colspan="3" style="border-top:1px solid #dddddd; padding:0;">
     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse; font-family: Arial;">
@@ -804,7 +789,7 @@ function buildInteractiveSimpleBlockHtml(block) {
   <td width="20%" align="center" valign="middle" style="${leftStyle}">
     <strong contenteditable="true" data-editable="true" data-kind="block" data-block-id="${escapeHtml(
       block.id
-    )}" data-field="time">${escapeHtml(block.time || "")}</strong>
+    )}" data-field="time">${escapeHtml(normalizeTimeDash(block.time || ""))}</strong>
   </td>
   <td colspan="3" align="left" valign="middle" style="${rightStyle}">
     ${labelInner}
@@ -1755,7 +1740,13 @@ function InteractivePreview({ state, setState }) {
       if (data.type === "amcham-inline-edit" && data.field) {
         savePreviewScroll();
         skipNextPreviewDocUpdateRef.current = true;
-        setState((s) => ({ ...s, [data.field]: data.value }));
+        setState((s) => ({
+          ...s,
+          [data.field]:
+            data.field === "timeLine"
+              ? normalizeTimeDash(data.value)
+              : data.value,
+        }));
         return;
       }
 
@@ -1769,7 +1760,15 @@ function InteractivePreview({ state, setState }) {
         setState((s) => ({
           ...s,
           blocks: (s.blocks || []).map((b) =>
-            b.id === data.blockId ? { ...b, [data.field]: data.value } : b
+            b.id === data.blockId
+              ? {
+                  ...b,
+                  [data.field]:
+                    data.field === "time"
+                      ? normalizeTimeDash(data.value)
+                      : data.value,
+                }
+              : b
           ),
         }));
         return;
@@ -1870,7 +1869,11 @@ export default function App() {
   }, [blocks, selectedBlockId]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+      console.warn("Could not save editor state to localStorage.", error);
+    }
   }, [state]);
 
   const selectedBlock =
@@ -2158,6 +2161,9 @@ export default function App() {
                   <Input
                     value={state.timeLine}
                     onChange={(e) => setField("timeLine", e.target.value)}
+                    onBlur={(e) =>
+                      setField("timeLine", normalizeTimeDash(e.target.value))
+                    }
                   />
                 </Field>
               </div>
@@ -2491,6 +2497,9 @@ export default function App() {
                         <Input
                           value={selectedBlock.time}
                           onChange={(e) => updateBlock({ time: e.target.value })}
+                          onBlur={(e) =>
+                            updateBlock({ time: normalizeTimeDash(e.target.value) })
+                          }
                         />
                       </Field>
                       <Field label="Label">
@@ -2553,6 +2562,9 @@ export default function App() {
                         <Input
                           value={selectedBlock.time}
                           onChange={(e) => updateBlock({ time: e.target.value })}
+                          onBlur={(e) =>
+                            updateBlock({ time: normalizeTimeDash(e.target.value) })
+                          }
                         />
                       </Field>
                       <Field label="Session title">
@@ -2835,6 +2847,7 @@ function normalizeState(value) {
   if (!value || typeof value !== "object") return base;
 
   const next = { ...base, ...value };
+  next.timeLine = normalizeTimeDash(next.timeLine || base.timeLine);
   next.blocks = Array.isArray(value.blocks) && value.blocks.length ? value.blocks : base.blocks;
 
   next.blocks = next.blocks
@@ -2844,6 +2857,10 @@ function normalizeState(value) {
         ? block.type
         : "simple";
       const normalized = { ...block, id: block.id || uid(), type };
+
+      if (type === "simple" || type === "session") {
+        normalized.time = normalizeTimeDash(block.time || "");
+      }
 
       if (type === "session") {
         normalized.speakers = Array.isArray(block.speakers)
