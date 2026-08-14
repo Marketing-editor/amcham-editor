@@ -1476,10 +1476,16 @@ function InteractivePreview({ state, setState }) {
   const savePreviewScroll = () => {
     const win = iframeRef.current?.contentWindow;
     if (!win) return;
-    previewScrollRef.current = {
-      x: win.scrollX || win.pageXOffset || 0,
-      y: win.scrollY || win.pageYOffset || 0,
-    };
+
+    try {
+      previewScrollRef.current = {
+        x: win.scrollX || win.pageXOffset || 0,
+        y: win.scrollY || win.pageYOffset || 0,
+      };
+    } catch {
+      // A sandboxed srcDoc iframe may briefly be cross-origin while reloading.
+      // Keep the last known scroll position instead of crashing the editor.
+    }
   };
 
   const restorePreviewScroll = () => {
@@ -1736,6 +1742,22 @@ function InteractivePreview({ state, setState }) {
 </body>
 </html>`;
 
+  // Keep a separate iframe document. Preview-originated edits already changed the
+  // DOM inside the iframe, so reloading srcDoc after those edits would both move
+  // the preview back to the top and interrupt blur-based synchronization.
+  const [iframeDoc, setIframeDoc] = useState(editableDoc);
+  const skipNextPreviewDocUpdateRef = useRef(false);
+
+  useEffect(() => {
+    if (skipNextPreviewDocUpdateRef.current) {
+      skipNextPreviewDocUpdateRef.current = false;
+      return;
+    }
+
+    savePreviewScroll();
+    setIframeDoc(editableDoc);
+  }, [editableDoc]);
+
   useEffect(() => {
     const onMessage = (event) => {
       const data = event?.data;
@@ -1743,6 +1765,7 @@ function InteractivePreview({ state, setState }) {
 
       if (data.type === "amcham-inline-edit" && data.field) {
         savePreviewScroll();
+        skipNextPreviewDocUpdateRef.current = true;
         setState((s) => ({ ...s, [data.field]: data.value }));
         return;
       }
@@ -1753,6 +1776,7 @@ function InteractivePreview({ state, setState }) {
         data.field
       ) {
         savePreviewScroll();
+        skipNextPreviewDocUpdateRef.current = true;
         setState((s) => ({
           ...s,
           blocks: (s.blocks || []).map((b) =>
@@ -1769,6 +1793,7 @@ function InteractivePreview({ state, setState }) {
         data.field
       ) {
         savePreviewScroll();
+        skipNextPreviewDocUpdateRef.current = true;
         setState((s) => ({
           ...s,
           blocks: (s.blocks || []).map((b) =>
@@ -1810,7 +1835,7 @@ function InteractivePreview({ state, setState }) {
             background: "#fff",
           }}
           sandbox="allow-scripts"
-          srcDoc={editableDoc}
+          srcDoc={iframeDoc}
           onLoad={restorePreviewScroll}
         />
       </div>
