@@ -755,7 +755,7 @@ function buildInteractiveSessionBlockHtml(block) {
     .join("\n");
 
   return `
-<tr style="font-size:11pt;">
+<tr data-preview-block-id="${escapeHtml(block.id)}" style="font-size:11pt;">
   <td width="20%" align="center" valign="middle"
       style="background:#fff; border-top:1px solid #dddddd; border-right:1px solid #dddddd; padding:5px;">
     <strong contenteditable="true" data-editable="true" data-kind="block" data-block-id="${escapeHtml(
@@ -1469,7 +1469,7 @@ function Segmented({ value, onChange, options }) {
 
 /* -------------------- Interactive preview -------------------- */
 
-function InteractivePreview({ state, setState }) {
+function InteractivePreview({ state, setState, onSelectBlock }) {
   const iframeRef = useRef(null);
   const previewScrollRef = useRef({ x: 0, y: 0 });
 
@@ -1696,6 +1696,18 @@ function InteractivePreview({ state, setState }) {
   </div>
 
   <script>
+    // Selection is independent of editing: keep focus, caret and iframe scroll intact.
+    document.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const section = target.closest('[data-preview-block-id]');
+      if (!section) return;
+      parent.postMessage({
+        type: 'amcham-select-block',
+        blockId: section.dataset.previewBlockId,
+      }, '*');
+    });
+
     const sendField = (field, value) => {
       parent.postMessage({ type: 'amcham-inline-edit', field, value }, '*');
     };
@@ -1763,6 +1775,13 @@ function InteractivePreview({ state, setState }) {
       const data = event?.data;
       if (!data) return;
 
+      if (data.type === "amcham-select-block") {
+        if (event.source !== iframeRef.current?.contentWindow) return;
+        if (typeof data.blockId !== "string") return;
+        onSelectBlock?.(data.blockId);
+        return;
+      }
+
       if (data.type === "amcham-inline-edit" && data.field) {
         savePreviewScroll();
         skipNextPreviewDocUpdateRef.current = true;
@@ -1814,7 +1833,7 @@ function InteractivePreview({ state, setState }) {
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [setState]);
+  }, [setState, onSelectBlock]);
 
   return (
     <div>
@@ -1858,6 +1877,16 @@ export default function App() {
   const [selectedBlockId, setSelectedBlockId] = useState(
     blocks[0]?.id || null
   );
+  // Keep a stable callback so selection never changes the preview document.
+  const previewSelectableBlocksRef = useRef(blocks);
+  useEffect(() => {
+    previewSelectableBlocksRef.current = blocks;
+  }, [blocks]);
+  const selectBlockFromPreview = useRef((blockId) => {
+    if (previewSelectableBlocksRef.current.some((block) => block.id === blockId)) {
+      setSelectedBlockId(blockId);
+    }
+  }).current;
   const [previewMode, setPreviewMode] = useState("interactive");
   const [importHtmlText, setImportHtmlText] = useState("");
   const importFileInputRef = useRef(null);
@@ -2808,7 +2837,11 @@ export default function App() {
               }
             >
               {previewMode === "interactive" ? (
-                <InteractivePreview state={state} setState={setState} />
+                <InteractivePreview
+                  state={state}
+                  setState={setState}
+                  onSelectBlock={selectBlockFromPreview}
+                />
               ) : (
                 <div style={styles.previewWrap}>
                   <iframe
